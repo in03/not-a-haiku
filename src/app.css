@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .zen-focus {
+    @apply ring-2 ring-green-500 ring-opacity-50;
+  }
+  
+  .zen-card {
+    @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-xl rounded-2xl;
+  }
+  
+  .zen-textarea {
+    @apply w-full p-6 text-lg leading-relaxed resize-none border-0 bg-transparent focus:outline-none focus:ring-0;
+  }
+  
+  .syllable-indicator {
+    @apply inline-block px-2 py-1 text-sm font-medium rounded-full;
+  }
+  
+  .syllable-perfect {
+    @apply bg-green-100 text-green-700;
+  }
+  
+  .syllable-over {
+    @apply bg-red-100 text-red-700;
+  }
+  
+  .syllable-under {
+    @apply bg-blue-100 text-blue-700;
+  }
+}

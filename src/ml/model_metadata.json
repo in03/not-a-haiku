@@ -1,0 +1,83 @@
+{
+  "model_info": {
+    "name": "syllable_counter",
+    "version": "1.0.0",
+    "description": "Neural network for counting syllables in English words",
+    "accuracy": "95.82%",
+    "total_parameters": 6833
+  },
+  "architecture": {
+    "layers": [
+      "Bidirectional GRU (16 units, return_sequences=True)",
+      "GRU (16 units, return_sequences=False)",
+      "Dense (1 unit, linear activation)"
+    ],
+    "input_shape": [
+      null,
+      18,
+      28
+    ],
+    "output_shape": [
+      null,
+      1
+    ]
+  },
+  "character_encoding": {
+    "alphabet": [
+      "'",
+      "-",
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i",
+      "j",
+      "k",
+      "l",
+      "m",
+      "n",
+      "o",
+      "p",
+      "q",
+      "r",
+      "s",
+      "t",
+      "u",
+      "v",
+      "w",
+      "x",
+      "y",
+      "z"
+    ],
+    "alphabet_size": 28,
+    "max_word_length": 18,
+    "encoding": "one-hot"
+  },
+  "usage": {
+    "input_format": "Float32 tensor of shape [batch_size, 18, 28]",
+    "output_format": "Float32 tensor of shape [batch_size, 1]",
+    "preprocessing": "Convert word to lowercase, encode as one-hot character sequence",
+    "postprocessing": "Round to nearest integer, minimum 1 syllable"
+  },
+  "training_info": {
+    "dataset": "CMU Pronunciation Dictionary",
+    "training_samples": "~94,000 words",
+    "validation_accuracy": "95.82%",
+    "optimizer": "Adam (lr=0.001)",
+    "loss_function": "Mean Squared Error"
+  },
+  "compatibility": {
+    "onnx_version": "1.13+",
+    "opset_version": 13,
+    "supported_runtimes": [
+      "ONNX Runtime (Python, C++, C#, Java, JavaScript)",
+      "TensorFlow Lite",
+      "Core ML (macOS/iOS)",
+      "DirectML (Windows)"
+    ]
+  }
+} 

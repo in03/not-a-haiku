@@ -1,0 +1,111 @@
+# SvelteKit build output
+/.svelte-kit
+/build
+
+# Node dependencies
+/node_modules
+
+# Environment files
+.env
+.env.*
+
+# VS Code settings
+.vscode/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Mac system files
+.DS_Store
+
+# SvelteKit preview output
+/.vercel
+
+# Local serverless emulation
+/.netlify
+
+# SvelteKit adapter-static output (if used)
+output/
+
+# SvelteKit adapter-node output (if used)
+adapter-node/build/
+
+# SvelteKit adapter-vercel output (if used)
+.vercel/output/
+
+# SvelteKit adapter-cloudflare output (if used)
+.worker/
+
+# SvelteKit adapter-deno output (if used)
+deno_dist/
+
+# SvelteKit adapter-azure output (if used)
+azure_dist/
+
+# SvelteKit adapter-bun output (if used)
+bun_dist/
+
+# SvelteKit adapter-aws output (if used)
+.aws_dist/
+
+# SvelteKit adapter-static output (if used)
+static_build/
+
+# SvelteKit adapter-netlify output (if used)
+.netlify/
+
+# SvelteKit adapter-node output (if used)
+node_build/
+
+# SvelteKit adapter-static output (if used)
+static_output/
+
+# SvelteKit adapter output (catch-all)
+*.output/
+
+# SvelteKit prerendered output
+prerendered/
+
+# SvelteKit preview output
+preview/
+
+# SvelteKit build cache
+.svelte-kit-output/
+
+# SvelteKit package output
+package/
+
+# SvelteKit kit output
+kit-output/
+
+# SvelteKit temp files
+*.svelte-kit
+
+# SvelteKit lock files
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+
+# SvelteKit test coverage
+coverage/
+
+# SvelteKit storybook
+.storybook/
+storybook-static/
+
+# SvelteKit Playwright test output
+test-results/
+playwright-report/
+
+# SvelteKit Cypress test output
+cypress/screenshots/
+cypress/videos/
+cypress/results/
+
+# Misc
+*.log
+npm-debug.log*
+# End Generation Here

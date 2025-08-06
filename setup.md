@@ -4,7 +4,7 @@
 
 ```bash
 # Navigate to the project
-cd sveltekit-haiku
+cd not-a-haiku
 
 # Install dependencies
 npm install

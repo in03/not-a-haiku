@@ -29,7 +29,6 @@
   function handleValidation(event) {
     const previousValid = validation.isValid;
     validation = event.detail;
-    console.log('Validation update:', validation);
     
     // Cycle celebration message when haiku becomes valid
     if (validation.isValid && !previousValid) {
@@ -95,6 +94,12 @@
       event.preventDefault();
       startHaiku();
     }
+  }
+  
+  function handleToast(event) {
+    showToast = true;
+    toastMessage = event.detail.message;
+    toastType = event.detail.type;
   }
 </script>
 
@@ -180,6 +185,7 @@
         <HaikuEditor
           bind:content
           on:validation={handleValidation}
+          on:toast={handleToast}
           placeholder="The pen is mightier than the sword"
         />
         

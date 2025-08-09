@@ -15,6 +15,7 @@
   let isProcessingOverLimit = false;
   let lastValidationTime = 0;
   let hasTriggeredConfetti = false;
+  let isInputBlocked = false;
   
   // Reactive validation
   $: {
@@ -50,7 +51,7 @@
         hasTriggeredConfetti = false;
       }
       
-      console.log(`Syllable validation: ${(performance.now() - now).toFixed(2)}ms`, syllableCounts);
+
     } catch (error) {
       console.error('Validation error:', error);
       // Fallback to basic validation
@@ -69,7 +70,7 @@
     if (isProcessingOverLimit) return;
     
     isProcessingOverLimit = true;
-    console.log('Processing over-limit: analyzing line content');
+
     
     if (textarea) {
       const currentPos = textarea.selectionStart;
@@ -88,7 +89,7 @@
         
         // If we're at exactly the right syllables and it's a complete word
         if (syllableCounts[currentLineIndex] === expectedSyllables[currentLineIndex] && !isPartialWord) {
-          console.log('Exactly right syllables on complete word - moving to next line');
+  
           // Move to next line if not the last line
           if (currentLineIndex < 2) {
             const beforeCursor = content.substring(0, currentPos);
@@ -101,7 +102,7 @@
             }, 0);
           }
         } else {
-          console.log('Over syllable limit - backspacing to last valid word');
+    
           // Find the last word boundary before the current position
           let lastWordBoundary = currentPos;
           while (lastWordBoundary > lineStart && 
@@ -145,9 +146,24 @@
   function handleKeydown(event) {
     if (!textarea) return;
     
+    // Block all input during the no-input period
+    if (isInputBlocked) {
+      // Still allow navigation and deletion keys during blocking
+      const allowedDuringBlock = [
+        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+        'Home', 'End', 'PageUp', 'PageDown',
+        'Backspace', 'Delete', 'Tab', 'Escape'
+      ];
+      
+      if (!allowedDuringBlock.includes(event.key) && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault();
+        return;
+      }
+    }
+    
     const cursorPos = textarea.selectionStart;
     
-    console.log('Keydown:', event.key, 'Syllable counts:', syllableCounts);
+
     
     // Allow special keys
     const allowedKeys = [
@@ -157,30 +173,48 @@
     ];
     
     if (allowedKeys.includes(event.key)) {
-      console.log('Allowed navigation key:', event.key);
+
       return;
     }
     
-    // Allow Ctrl/Cmd combinations
+    // Allow Ctrl/Cmd combinations, but block paste
     if (event.ctrlKey || event.metaKey) {
-      console.log('Allowed shortcut:', event.key);
+      // Block Ctrl+V/Cmd+V paste
+      if (event.key === 'v' || event.key === 'V') {
+        event.preventDefault();
+        dispatch('toast', {
+          message: "Hey! Keep it original! No plagiarism. 📝",
+          type: 'warning'
+        });
+        return;
+      }
       return;
+    }
+    
+    // Filter input to alphabetical characters and basic punctuation only
+    // Allowed: letters, spaces, newlines, apostrophes, periods, commas, semicolons, colons, exclamation, question marks, hyphens
+    if (event.key.length === 1) { // Only check single character inputs
+      const allowedCharPattern = /[a-zA-Z\s\n'.,;:!?\-\(\)]/;
+      if (!allowedCharPattern.test(event.key)) {
+        event.preventDefault();
+        return;
+      }
     }
     
     // Get current line info
     const currentLineIndex = getCurrentLineIndex(content, cursorPos);
-    console.log('Current line index:', currentLineIndex);
+
     
     // Only enforce on first 3 lines
     if (currentLineIndex >= 3) {
-      console.log('Beyond line 3, no enforcement');
+
       return;
     }
     
     const expectedSyll = expectedSyllables[currentLineIndex];
     const currentSyll = syllableCounts[currentLineIndex] || 0;
     
-    console.log(`Line ${currentLineIndex}: ${currentSyll}/${expectedSyll} syllables`);
+
     
     // Check if we're at a word boundary (space or newline before cursor)
     const isAtWordBoundary = cursorPos === 0 || 
@@ -189,7 +223,7 @@
     
     // Handle SPACE and ENTER at syllable limits
     if ((event.key === ' ' || event.key === 'Enter') && currentSyll === expectedSyll && !isAtWordBoundary) {
-      console.log('Space/Enter at syllable limit - auto line break');
+
       event.preventDefault();
       
       if (currentLineIndex < 2) {
@@ -210,28 +244,45 @@
     
     // Allow typing to continue - validation will catch up and handle over-limit
     if (currentSyll > expectedSyll && !isAtWordBoundary) {
-      console.log('Over syllable limit, but allowing input - validation will catch up');
+
       // Don't prevent default - let the user keep typing
       shakeWindow();
       return;
     }
     
     // Allow input if under the limit
-    console.log('Under syllable limit, allowing input');
+
   }
   
   function shakeWindow() {
     if (isShaking) {
-      console.log('Shake already in progress, skipping');
+
       return;
     }
     
-    console.log('Shaking window');
+
     isShaking = true;
+    isInputBlocked = true;
     
+    // Shake animation ends after 500ms
     setTimeout(() => {
       isShaking = false;
     }, 500);
+    
+    // Input blocking continues for 1 second total
+    setTimeout(() => {
+      isInputBlocked = false;
+    }, 1000);
+  }
+  
+  function handlePaste(event) {
+    event.preventDefault();
+    
+    // Dispatch toast event to parent
+    dispatch('toast', {
+      message: "Hey! Keep it original! No plagiarism. 📝",
+      type: 'warning'
+    });
   }
   
   // Watch for over-limit conditions after validation
@@ -250,7 +301,7 @@
     // Initialize the ONNX model
     try {
       await initializeSyllableCounter();
-      console.log('ONNX syllable counter initialized successfully');
+
     } catch (error) {
       console.error('Failed to initialize ONNX syllable counter:', error);
     }
@@ -261,7 +312,7 @@
   });
 </script>
 
-<div class="relative {isShaking ? 'animate-shake' : ''}">
+<div class="relative {isShaking ? 'animate-shake' : ''} {isInputBlocked ? 'input-blocked' : ''}">
   <!-- Syllable indicators -->
   <div class="flex gap-2 mb-4">
     {#each syllableCounts as count, index}
@@ -276,6 +327,7 @@
     bind:this={textarea}
     bind:value={content}
     on:keydown={handleKeydown}
+    on:paste={handlePaste}
     {placeholder}
     class="zen-textarea"
     rows="6"
@@ -288,5 +340,15 @@
   textarea {
     font-family: 'Georgia', serif;
     line-height: 1.8;
+  }
+  
+  .input-blocked {
+    opacity: 0.4;
+    transition: opacity 0.2s ease-in-out;
+    pointer-events: none;
+  }
+  
+  .input-blocked textarea {
+    cursor: not-allowed;
   }
 </style>

@@ -1,6 +1,12 @@
 /**
  * ONNX-based syllable counter using dictionary lookup with ML fallback
  * Similar to the Elixir implementation but for JavaScript/SvelteKit
+ * 
+ * Verbose logging shows:
+ * - Dict lookup vs ML inference timing
+ * - Character encoding for ML model input
+ * - Raw ML output values before rounding
+ * - Overall haiku validation timing
  */
 
 import * as ort from 'onnxruntime-web';
@@ -10,6 +16,15 @@ import modelMetadata from '../ml/model_metadata.json';
 // Model session cache
 let modelSession = null;
 let isModelLoaded = false;
+
+// Verbose logging flag
+const VERBOSE = true; // Set to false to disable verbose logging
+
+function verboseLog(...args) {
+  if (VERBOSE) {
+    console.log('[VERBOSE]', ...args);
+  }
+}
 
 /**
  * Initialize ONNX model session
@@ -24,13 +39,7 @@ async function initializeModel() {
     isModelLoaded = true;
     console.log('ONNX syllable model loaded successfully');
     
-    // Debug: log model input/output info
-    console.log('Model inputs:', modelSession.inputNames);
-    console.log('Model outputs:', modelSession.outputNames);
-    console.log('Model input metadata:', modelSession.inputNames.map(name => ({
-      name,
-      shape: modelSession.inputNames.includes(name) ? modelSession.inputNames : 'unknown'
-    })));
+
   } catch (error) {
     console.error('Failed to load ONNX model:', error);
     throw new Error('ML model initialization failed');
@@ -80,6 +89,9 @@ async function mlSyllableCount(word) {
       await initializeModel();
     }
     
+    const cleanWord = word.toLowerCase().replace(/[^a-z'-]/g, '');
+    verboseLog(`ML encoding: "${cleanWord}" -> [${cleanWord.split('').join(', ')}]`);
+    
     // Preprocess input
     const inputTensor = preprocessWord(word);
     const inputShape = [1, modelMetadata.character_encoding.max_word_length, modelMetadata.character_encoding.alphabet_size];
@@ -89,19 +101,17 @@ async function mlSyllableCount(word) {
     
     // Get the correct input name from the model
     const inputName = modelSession.inputNames[0];
-    console.log('Using input name:', inputName);
+
     
     // Run inference
     const feeds = { [inputName]: input };
     const results = await modelSession.run(feeds);
     
-    // Debug: log the results structure
-    console.log('ONNX results:', results);
-    console.log('ONNX results keys:', Object.keys(results));
+
     
     // Get output - use the correct output name from the model
     const outputName = modelSession.outputNames[0];
-    console.log('Using output name:', outputName);
+
     let output = results[outputName];
     
     if (!output) {
@@ -109,10 +119,9 @@ async function mlSyllableCount(word) {
       throw new Error('ONNX model output not found');
     }
     
-    console.log('ONNX output:', output);
-    console.log('ONNX output data:', output.data);
-    
-    const syllableCount = Math.round(output.data[0]);
+    const rawOutput = output.data[0];
+    const syllableCount = Math.round(rawOutput);
+    verboseLog(`ML raw output: ${rawOutput.toFixed(4)} -> ${syllableCount} syllables`);
     
     // Ensure minimum 1 syllable
     return Math.max(1, syllableCount);
@@ -184,17 +193,27 @@ async function countWordSyllables(word, isComplete) {
   
   if (cleanWord.length === 0) return 0;
   
+  const startTime = performance.now();
+  
   if (isComplete) {
     // Complete word: Use dictionary first, ML fallback
     const dictResult = cmuDict[cleanWord];
     if (dictResult !== undefined) {
+      const dictTime = performance.now() - startTime;
+      verboseLog(`Dict lookup: "${cleanWord}" = ${dictResult} syllables (${dictTime.toFixed(2)}ms)`);
       return dictResult;
     }
     // Unknown complete word: use ML fallback
-    return await mlSyllableCount(cleanWord);
+    const mlResult = await mlSyllableCount(cleanWord);
+    const mlTime = performance.now() - startTime;
+    verboseLog(`ML inference: "${cleanWord}" = ${mlResult} syllables (${mlTime.toFixed(2)}ms)`);
+    return mlResult;
   } else {
     // Partial word: Always use ML for real-time feedback
-    return await mlSyllableCount(cleanWord);
+    const mlResult = await mlSyllableCount(cleanWord);
+    const mlTime = performance.now() - startTime;
+    verboseLog(`ML inference (partial): "${cleanWord}" = ${mlResult} syllables (${mlTime.toFixed(2)}ms)`);
+    return mlResult;
   }
 }
 
@@ -229,6 +248,7 @@ export async function countHaikuSyllables(content) {
     return [0, 0, 0];
   }
   
+  const startTime = performance.now();
   const lines = content.split(/\r?\n/);
   const syllableCounts = [];
   
@@ -237,6 +257,9 @@ export async function countHaikuSyllables(content) {
     const result = await countSyllables(line.trim());
     syllableCounts.push(result.total);
   }
+  
+  const totalTime = performance.now() - startTime;
+  verboseLog(`Haiku validation: [${syllableCounts.join(', ')}] vs [5, 7, 5] (${totalTime.toFixed(2)}ms total)`);
   
   return syllableCounts;
 }

@@ -108,17 +108,17 @@
   <div class="text-center mb-12 animate-fade-in">
     <div class="flex items-center justify-center gap-3 mb-4">
       {#if validation.isValid}
-        <CheckCircle class="w-8 h-8 text-green-600" />
+        <CheckCircle class="w-8 h-8 text-success" />
       {:else}
-        <XCircle class="w-8 h-8 text-red-600" />
+        <XCircle class="w-8 h-8 text-error" />
       {/if}
       <h1 class="text-4xl font-bold bg-gradient-to-r {validation.isValid ? 'from-green-600 to-emerald-600' : 'from-red-600 to-pink-600'} bg-clip-text text-transparent transition-all duration-500">
         {validation.isValid ? 'It\'s a Haiku!' : 'Not a Haiku'}
       </h1>
       {#if validation.isValid}
-        <Sparkles class="w-8 h-8 text-green-600" />
+        <Sparkles class="w-8 h-8 text-success" />
       {:else}
-        <Leaf class="w-8 h-8 text-red-600" />
+        <Leaf class="w-8 h-8 text-error" />
       {/if}
     </div>
     <p class="text-gray-600 text-lg transition-all duration-500">
@@ -148,7 +148,7 @@
             bind:value={title}
             on:keydown={handleTitleKeydown}
             placeholder="Enter your haiku title..."
-            class="w-full p-4 text-lg text-center border-2 border-green-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors bg-white/80"
+            class="input input-bordered w-full text-center text-lg bg-white/80"
             autocomplete="off"
             autofocus
           />
@@ -156,7 +156,7 @@
           {#if title.trim()}
             <button
               on:click={startHaiku}
-              class="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+              class="btn btn-success btn-sm absolute right-2 top-1/2 -translate-y-1/2"
               aria-label="Start writing haiku"
             >
               <Sparkles class="w-5 h-5" />
@@ -187,7 +187,7 @@
         <div class="flex gap-3 mt-6 justify-center">
           <button
             on:click={cancelHaiku}
-            class="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            class="btn btn-ghost"
           >
             Cancel
           </button>
@@ -195,7 +195,7 @@
           {#if validation.isComplete}
             <button
               on:click={submitHaiku}
-              class="px-8 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg hover:from-green-600 hover:to-blue-600 transition-all transform hover:scale-105 flex items-center gap-2"
+              class="btn btn-primary"
             >
               <Send class="w-4 h-4" />
               Submit Haiku
@@ -203,7 +203,7 @@
           {:else}
             <button
               disabled
-              class="px-8 py-2 bg-gray-200 text-gray-400 rounded-lg cursor-not-allowed flex items-center gap-2"
+              class="btn btn-disabled"
             >
               <Send class="w-4 h-4" />
               Complete Your Haiku
@@ -213,8 +213,8 @@
         
         <!-- Validation Status -->
         {#if validation.feedback}
-          <div class="mt-4 p-3 rounded-lg text-center text-sm {validation.isComplete ? 'bg-green-50 text-green-700' : validation.isValid ? 'bg-blue-50 text-blue-700' : 'bg-yellow-50 text-yellow-700'}">
-            {validation.feedback}
+          <div class="alert mt-4 {validation.isComplete ? 'alert-success' : validation.isValid ? 'alert-info' : 'alert-warning'}">
+            <span>{validation.feedback}</span>
           </div>
         {/if}
       </div>
@@ -257,64 +257,5 @@
   @keyframes scaleIn {
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
-  }
-  
-  .zen-card {
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  }
-  
-  .zen-textarea {
-    background: rgba(255, 255, 255, 0.8);
-    border: 2px solid rgba(34, 197, 94, 0.2);
-    border-radius: 12px;
-    padding: 16px;
-    font-size: 16px;
-    transition: all 0.3s ease;
-    resize: none;
-  }
-  
-  .zen-textarea:focus {
-    outline: none;
-    border-color: rgba(34, 197, 94, 0.5);
-    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-  }
-  
-  .syllable-indicator {
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-  }
-  
-  .syllable-perfect {
-    background: rgba(34, 197, 94, 0.1);
-    color: rgb(22, 163, 74);
-    border: 1px solid rgba(34, 197, 94, 0.2);
-  }
-  
-  .syllable-over {
-    background: rgba(239, 68, 68, 0.1);
-    color: rgb(185, 28, 28);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-  }
-  
-  .syllable-under {
-    background: rgba(245, 158, 11, 0.1);
-    color: rgb(180, 83, 9);
-    border: 1px solid rgba(245, 158, 11, 0.2);
-  }
-  
-  .animate-shake {
-    animation: shake 0.5s ease-in-out;
-  }
-  
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-5px); }
-    75% { transform: translateX(5px); }
   }
 </style>

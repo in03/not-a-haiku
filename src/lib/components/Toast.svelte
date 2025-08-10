@@ -19,17 +19,17 @@
   };
   
   const styles = {
-    success: 'bg-green-50 border-green-200 text-green-800',
-    error: 'bg-red-50 border-red-200 text-red-800',
-    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    info: 'bg-blue-50 border-blue-200 text-blue-800'
+    success: 'alert-success',
+    error: 'alert-error',
+    warning: 'alert-warning',
+    info: 'alert-info'
   };
   
   const iconStyles = {
-    success: 'text-green-500',
-    error: 'text-red-500',
-    warning: 'text-yellow-500',
-    info: 'text-blue-500'
+    success: 'text-success',
+    error: 'text-error',
+    warning: 'text-warning',
+    info: 'text-info'
   };
   
   $: if (show && duration > 0) {
@@ -48,17 +48,21 @@
 </script>
 
 {#if show}
-  <div class="fixed top-4 right-4 z-50 animate-scale-in">
-    <div class="flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg backdrop-blur-sm {styles[type]}">
-      <svelte:component this={icons[type]} class="w-5 h-5 {iconStyles[type]}" />
-      <span class="font-medium">{message}</span>
-      <button
-        on:click={close}
-        class="ml-2 p-1 rounded-full hover:bg-black/10 transition-colors"
-        aria-label="Close"
-      >
-        <XCircle class="w-4 h-4" />
-      </button>
+  <div class="toast toast-top toast-end z-50 animate-scale-in">
+    <div class="alert shadow-lg {styles[type]}">
+      <div class="flex items-center gap-3">
+        <svelte:component this={icons[type]} class="w-5 h-5 {iconStyles[type]}" />
+        <span class="font-medium">{message}</span>
+      </div>
+      <div>
+        <button
+          on:click={close}
+          class="btn btn-ghost btn-xs"
+          aria-label="Close"
+        >
+          Close
+        </button>
+      </div>
     </div>
   </div>
 {/if}

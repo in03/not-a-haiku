@@ -17,13 +17,10 @@ import modelMetadata from '../ml/model_metadata.json';
 let modelSession = null;
 let isModelLoaded = false;
 
-// Verbose logging flag
-const VERBOSE = true; // Set to false to disable verbose logging
-
+// Verbose logging that respects Chrome dev tools log level
 function verboseLog(...args) {
-  if (VERBOSE) {
-    console.log('[VERBOSE]', ...args);
-  }
+  // Use console.debug which respects Chrome's "Verbose" log level setting
+  console.debug('[VERBOSE]', ...args);
 }
 
 /**
@@ -196,6 +193,13 @@ async function countWordSyllables(word, isComplete) {
   const startTime = performance.now();
   
   if (isComplete) {
+    // Special rule: Single letters are treated as words (1 syllable) when complete
+    // This addresses the acronym vs word ambiguity mentioned in syllable-quirks.md
+    if (cleanWord.length === 1) {
+      verboseLog(`Single letter rule: "${cleanWord}" = 1 syllable (complete word)`);
+      return 1;
+    }
+    
     // Complete word: Use dictionary first, ML fallback
     const dictResult = cmuDict[cleanWord];
     if (dictResult !== undefined) {
@@ -241,47 +245,59 @@ export async function countSyllables(text) {
 }
 
 /**
- * Count syllables for haiku lines (returns array of counts)
+ * Count syllables for poem lines (returns array of counts)
  */
-export async function countHaikuSyllables(content) {
+export async function countHaikuSyllables(content, expectedSyllables = [5, 7, 5]) {
   if (!content || content.trim().length === 0) {
-    return [0, 0, 0];
+    return new Array(expectedSyllables.length).fill(0);
   }
   
   const startTime = performance.now();
   const lines = content.split(/\r?\n/);
   const syllableCounts = [];
   
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < expectedSyllables.length; i++) {
     const line = lines[i] || '';
     const result = await countSyllables(line.trim());
     syllableCounts.push(result.total);
   }
   
   const totalTime = performance.now() - startTime;
-  verboseLog(`Haiku validation: [${syllableCounts.join(', ')}] vs [5, 7, 5] (${totalTime.toFixed(2)}ms total)`);
+  verboseLog(`Poem validation: [${syllableCounts.join(', ')}] vs [${expectedSyllables.join(', ')}] (${totalTime.toFixed(2)}ms total)`);
   
   return syllableCounts;
 }
 
 /**
- * Validate haiku structure and provide feedback
+ * Validate poem structure and provide feedback
  */
-export async function validateHaiku(content) {
-  const syllableCounts = await countHaikuSyllables(content);
-  const expectedSyllables = [5, 7, 5];
-  const lines = content.split(/\r?\n/).slice(0, 3);
+export async function validateHaiku(content, expectedSyllables = [5, 7, 5], poemType = 'haiku') {
+  const syllableCounts = await countHaikuSyllables(content, expectedSyllables);
+  const lines = content.split(/\r?\n/).slice(0, expectedSyllables.length);
   
-  // Check if valid haiku
-  const isValid = syllableCounts.every((count, index) => count === expectedSyllables[index]);
-  const isComplete = lines.every(line => line.trim().length > 0) && isValid;
+  // Require all required lines to exist and be non-empty
+  const hasAllRequiredLines =
+    lines.length === expectedSyllables.length && lines.every((line) => line.trim().length > 0);
+
+  // Structure match across all expected lines
+  const structureMatches = syllableCounts.every((count, index) => count === expectedSyllables[index]);
+
+  // A poem is considered valid only when complete (prevents partial poems from being "valid")
+  const isComplete = hasAllRequiredLines && structureMatches;
+  const isValid = isComplete;
   
   // Generate feedback
   let feedback = '';
   if (isComplete) {
-    feedback = "Perfect haiku! You're a natural poet.";
-  } else if (isValid && lines.some(line => line.trim().length === 0)) {
-    feedback = "Great syllable structure! Finish all three lines.";
+    feedback = `Perfect ${poemType}! You're a natural poet.`;
+  } else if (!hasAllRequiredLines) {
+    // Encourage finishing all lines when partial structure looks ok so far
+    const presentLines = lines.filter((l) => l.trim().length > 0).length;
+    if (presentLines > 0) {
+      feedback = `Great start! Finish all ${expectedSyllables.length} lines.`;
+    } else {
+      feedback = `Write your ${poemType}...`;
+    }
   } else {
     const issues = [];
     syllableCounts.forEach((count, index) => {
@@ -295,7 +311,7 @@ export async function validateHaiku(content) {
         }
       }
     });
-    feedback = issues.length > 0 ? issues[0] : "Keep writing your haiku...";
+    feedback = issues.length > 0 ? issues[0] : `Keep writing your ${poemType}...`;
   }
   
   return {

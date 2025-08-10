@@ -2,9 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
+/* CSS Variables for global theming */
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --border-color: #e5e7eb;
+  --border-focus: #3b82f6;
+  --accent: #10b981;
+  --accent-weak: #6ee7b7;
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: rgba(255, 255, 255, 0.2);
+  --card-shadow: rgba(0, 0, 0, 0.1);
+  --scrollbar-track: rgba(0,0,0,0.04);
+  --scrollbar-thumb: rgba(0,0,0,0.2);
+}
+
+.dark {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --border-color: #475569;
+  --border-focus: #60a5fa;
+  --accent: #34d399;
+  --accent-weak: #86efac;
+  --card-bg: rgba(30, 41, 59, 0.75);
+  --card-border: rgba(71, 85, 105, 0.3);
+  --card-shadow: rgba(0, 0, 0, 0.3);
+  --scrollbar-track: rgba(255,255,255,0.04);
+  --scrollbar-thumb: rgba(255,255,255,0.2);
+}
+
 @layer base {
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  /* Scrollbar styling (WebKit + Firefox) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: content-box;
   }
 }
 
@@ -14,11 +73,28 @@
   }
   
   .zen-card {
-    @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-xl rounded-2xl;
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--card-border);
+    box-shadow: 0 8px 32px var(--card-shadow);
+    border-radius: 1rem;
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   }
   
   .zen-textarea {
-    @apply w-full p-6 text-lg leading-relaxed resize-none border-0 bg-transparent focus:outline-none focus:ring-0;
+    @apply w-full p-6 text-lg leading-relaxed resize-none bg-transparent focus:outline-none focus:ring-0;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    background-color: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  }
+  .dark .zen-textarea {
+    background-color: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+  }
+  .zen-textarea:focus {
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-focus) 15%, transparent);
   }
   
   .syllable-indicator {
@@ -26,14 +102,20 @@
   }
   
   .syllable-perfect {
-    @apply bg-green-100 text-green-700;
+    @apply text-green-700;
+    background: color-mix(in srgb, #10b981 15%, transparent);
+    border: 1px solid color-mix(in srgb, #10b981 30%, transparent);
   }
   
   .syllable-over {
-    @apply bg-red-100 text-red-700;
+    @apply text-red-700;
+    background: color-mix(in srgb, #ef4444 15%, transparent);
+    border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
   }
   
   .syllable-under {
-    @apply bg-blue-100 text-blue-700;
+    @apply text-blue-700;
+    background: color-mix(in srgb, #3b82f6 12%, transparent);
+    border: 1px solid color-mix(in srgb, #3b82f6 25%, transparent);
   }
 }

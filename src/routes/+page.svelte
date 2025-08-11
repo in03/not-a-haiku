@@ -1,10 +1,12 @@
 <script>
-  import { Sparkles, Leaf, Send, XCircle, CheckCircle } from 'lucide-svelte';
+  import { Sparkles, Leaf, Send, XCircle, CheckCircle, Brain, RotateCcw } from 'lucide-svelte';
   import HaikuEditor from '$lib/components/HaikuEditor.svelte';
   import Toast from '$lib/components/Toast.svelte';
+  import AnalysisResults from '$lib/components/AnalysisResults.svelte';
+  import { analyzeHaiku, hasGitHubPAT } from '$lib/github-models.js';
   import confetti from 'canvas-confetti';
   
-  let step = 'title'; // 'title', 'content', 'complete'
+  let step = 'title'; // 'title', 'content', 'analysis', 'complete'
   let title = '';
   let content = '';
   let validation = { isValid: false, isComplete: false, feedback: '' };
@@ -12,6 +14,11 @@
   let toastMessage = '';
   let toastType = 'info';
   let celebrationIndex = 0;
+  
+  // Analysis state
+  let isAnalyzing = false;
+  let analysisResult = null;
+  let showAnalysis = false;
   
   const celebrationMessages = [
     "Well done",
@@ -37,57 +44,105 @@
     }
   }
   
-  function submitHaiku() {
+  async function submitHaiku() {
     if (validation.isComplete) {
-      // Launch epic confetti celebration!
-      const duration = 3 * 1000;
-      const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
-      function randomInRange(min, max) {
-        return Math.random() * (max - min) + min;
-      }
-
-      const interval = setInterval(function() {
-        const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval);
-        }
-
-        const particleCount = 50 * (timeLeft / duration);
+      // Check if GitHub PAT is available for analysis
+      if (hasGitHubPAT()) {
+        // Start analysis
+        step = 'analysis';
+        isAnalyzing = true;
+        analysisResult = null;
+        showAnalysis = false;
         
-        // since particles fall down, start a bit higher than random
-        confetti(Object.assign({}, defaults, {
-          particleCount,
-          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
-        }));
-        confetti(Object.assign({}, defaults, {
-          particleCount,
-          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
-        }));
-      }, 250);
-      
-      // Show success toast
-      showToast = true;
-      toastMessage = `✨ "${title}" submitted successfully! Your haiku is beautiful.`;
-      toastType = 'success';
-      
-      // Reset after success
-      setTimeout(() => {
-        step = 'title';
-        title = '';
-        content = '';
-        validation = { isValid: false, isComplete: false, feedback: '' };
-      }, 3000);
+        try {
+          const result = await analyzeHaiku(content, title);
+          analysisResult = result.success ? result.analysis : result.fallback;
+          isAnalyzing = false;
+          
+          // Show analysis results after a brief delay
+          setTimeout(() => {
+            showAnalysis = true;
+          }, 500);
+          
+          if (!result.success && result.error) {
+            showToast = true;
+            toastMessage = `⚠️ Analysis failed: ${result.error}`;
+            toastType = 'warning';
+          }
+        } catch (error) {
+          isAnalyzing = false;
+          analysisResult = {
+            rating: 3,
+            comment: "Unable to analyze - but every haiku has beauty!",
+            tags: ["creative", "poetry"]
+          };
+          showAnalysis = true;
+          
+          showToast = true;
+          toastMessage = `⚠️ Analysis error: ${error.message}`;
+          toastType = 'warning';
+        }
+      } else {
+        // Skip analysis and go straight to completion
+        completeHaikuSubmission();
+      }
     }
   }
   
-  function cancelHaiku() {
+  function completeHaikuSubmission() {
+    // Launch epic confetti celebration!
+    const duration = 3 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+    function randomInRange(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    const interval = setInterval(function() {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+
+      const particleCount = 50 * (timeLeft / duration);
+      
+      // since particles fall down, start a bit higher than random
+      confetti(Object.assign({}, defaults, {
+        particleCount,
+        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+      }));
+      confetti(Object.assign({}, defaults, {
+        particleCount,
+        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+      }));
+    }, 250);
+    
+    step = 'complete';
+    
+    // Show success toast
+    showToast = true;
+    toastMessage = `✨ "${title}" submitted successfully! Your haiku is beautiful.`;
+    toastType = 'success';
+  }
+  
+  function resetHaiku() {
     step = 'title';
     title = '';
     content = '';
     validation = { isValid: false, isComplete: false, feedback: '' };
+    isAnalyzing = false;
+    analysisResult = null;
+    showAnalysis = false;
+  }
+  
+  function cancelHaiku() {
+    resetHaiku();
+  }
+  
+  function startNewHaiku() {
+    resetHaiku();
   }
   
   function handleTitleKeydown(event) {
@@ -218,6 +273,87 @@
           </div>
         {/if}
       </div>
+      
+    {:else if step === 'analysis'}
+      <!-- Analysis Step -->
+      <div class="zen-card p-8 animate-scale-in text-center">
+        <div class="mb-8">
+          <h2 class="text-2xl font-bold text-gray-800 mb-2">
+            "{title}"
+          </h2>
+          <div class="text-gray-700 font-mono leading-relaxed whitespace-pre-line bg-gray-50 p-4 rounded-lg mb-6">
+{content}
+          </div>
+        </div>
+        
+        {#if isAnalyzing}
+          <div class="space-y-4">
+            <div class="flex items-center justify-center gap-3">
+              <Brain class="w-6 h-6 text-blue-600 animate-pulse" />
+              <h3 class="text-xl font-semibold text-gray-800">Analyzing your haiku...</h3>
+            </div>
+            <p class="text-gray-600">AI is interpreting your poem as a task and providing insights</p>
+            <div class="w-8 h-8 mx-auto border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          </div>
+        {:else if analysisResult}
+          <div class="space-y-6">
+            <AnalysisResults analysis={analysisResult} isVisible={showAnalysis} />
+            
+            <div class="flex gap-3 justify-center">
+              <button
+                on:click={startNewHaiku}
+                class="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+              >
+                <RotateCcw class="w-4 h-4" />
+                Write Another
+              </button>
+              
+              <button
+                on:click={completeHaikuSubmission}
+                class="px-8 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg hover:from-green-600 hover:to-blue-600 transition-all transform hover:scale-105 flex items-center gap-2"
+              >
+                <Sparkles class="w-4 h-4" />
+                Celebrate!
+              </button>
+            </div>
+          </div>
+        {/if}
+      </div>
+      
+    {:else if step === 'complete'}
+      <!-- Completion Step -->
+      <div class="zen-card p-8 animate-scale-in text-center">
+        <div class="mb-8">
+          <div class="flex items-center justify-center gap-3 mb-4">
+            <CheckCircle class="w-12 h-12 text-green-600" />
+            <Sparkles class="w-8 h-8 text-yellow-500 animate-pulse" />
+          </div>
+          <h2 class="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-4">
+            Haiku Submitted!
+          </h2>
+          <p class="text-gray-600 text-lg">
+            Your beautiful haiku "{title}" has been captured for posterity
+          </p>
+        </div>
+        
+        <div class="text-gray-700 font-mono leading-relaxed whitespace-pre-line bg-gray-50 p-6 rounded-lg mb-8 max-w-md mx-auto">
+{content}
+        </div>
+        
+        {#if analysisResult}
+          <div class="mb-8">
+            <AnalysisResults analysis={analysisResult} isVisible={true} />
+          </div>
+        {/if}
+        
+        <button
+          on:click={startNewHaiku}
+          class="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 flex items-center gap-2 mx-auto"
+        >
+          <RotateCcw class="w-5 h-5" />
+          Write Another Haiku
+        </button>
+      </div>
     {/if}
     
     <!-- Instructions -->
@@ -225,9 +361,33 @@
       <p class="mb-2">
         <strong>How it works:</strong> Type naturally and watch the syllable magic happen!
       </p>
-      <p>
+      <p class="mb-3">
         ✨ Auto line breaks • 🔄 Real-time validation • 📱 Works offline
       </p>
+      
+      {#if !hasGitHubPAT()}
+        <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800">
+          <div class="flex items-center justify-center gap-2 mb-2">
+            <Brain class="w-4 h-4" />
+            <strong>Want AI analysis of your haiku?</strong>
+          </div>
+          <p class="text-xs">
+            Set up your GitHub Personal Access Token in 
+            <a href="/settings" class="underline hover:text-blue-900">Settings</a> 
+            to get AI-powered insights about your poems as tasks!
+          </p>
+        </div>
+      {:else}
+        <div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800">
+          <div class="flex items-center justify-center gap-2 mb-1">
+            <CheckCircle class="w-4 h-4" />
+            <strong>AI Analysis Enabled!</strong>
+          </div>
+          <p class="text-xs">
+            Your haiku will be analyzed by AI for task insights and creativity ratings.
+          </p>
+        </div>
+      {/if}
     </div>
   </div>
 </div>

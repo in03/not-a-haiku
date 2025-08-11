@@ -73,7 +73,7 @@
 {#if isModal}
   {#if isOpen}
     <div class="settings-overlay" role="button" tabindex="0" on:click={handleClose} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleClose()}>
-      <div class="settings-modal" role="dialog" aria-modal="true" on:click|stopPropagation>
+      <div class="settings-modal" role="dialog" aria-modal="true" tabindex="0" on:keydown={(e) => e.key === 'Escape' && handleClose()} on:click|stopPropagation>
         <div class="settings-header">
           <h2 id="settings-title">Settings</h2>
           <button class="close-button" on:click={handleClose} aria-label="Close settings">
@@ -101,29 +101,32 @@
     <div class="settings-content">
       <!-- Presets -->
       <div class="setting-group">
-        <label class="setting-label">Preset</label>
-        <div class="radio-group">
-          <label class="label cursor-pointer gap-2">
-            <input type="radio" class="radio" bind:group={settings.preset} value="default" />
-            <span>Default</span>
+        <h3 id="preset-group-label" class="setting-label">Preset</h3>
+        <div class="radio-group" role="radiogroup" aria-labelledby="preset-group-label">
+          <label class="radio-option">
+            <input type="radio" class="radio-input" bind:group={settings.preset} value="default" />
+            <span class="radio-custom"></span>
+            <span class="radio-text">Default</span>
           </label>
-          <label class="label cursor-pointer gap-2">
-            <input type="radio" class="radio" bind:group={settings.preset} value="focus" />
-            <span>Focus</span>
+          <label class="radio-option">
+            <input type="radio" class="radio-input" bind:group={settings.preset} value="focus" />
+            <span class="radio-custom"></span>
+            <span class="radio-text">Focus</span>
           </label>
-          <label class="label cursor-pointer gap-2">
-            <input type="radio" class="radio" bind:group={settings.preset} value="custom" />
-            <span>Custom</span>
+          <label class="radio-option">
+            <input type="radio" class="radio-input" bind:group={settings.preset} value="custom" />
+            <span class="radio-custom"></span>
+            <span class="radio-text">Custom</span>
           </label>
         </div>
         <div class="setting-description">Choose a preset; changing individual settings switches to Custom.</div>
       </div>
       <!-- Poem Type Selection -->
       <div class="setting-group">
-        <label class="setting-label" for="poem-type-trigger">Poem Type</label>
+        <h3 class="setting-label" id="poem-type-label">Poem Type</h3>
         
         <!-- Dropdown-style trigger -->
-          <button id="poem-type-trigger" class="poem-type-trigger" type="button" on:click={togglePoemTypeSelector} aria-expanded={poemTypeExpanded} aria-controls="poem-type-grid">
+          <button id="poem-type-trigger" aria-labelledby="poem-type-label" class="poem-type-trigger" type="button" on:click={togglePoemTypeSelector} aria-expanded={poemTypeExpanded} aria-controls="poem-type-grid">
             <div class="poem-type-current">
               <div class="poem-type-name">{poemTypes[/** @type {keyof typeof poemTypes} */ (settings.poemType)].name}</div>
               <div class="poem-type-syllables">{poemTypes[/** @type {keyof typeof poemTypes} */ (settings.poemType)].syllables.join('-')} syllables</div>
@@ -154,23 +157,25 @@
       
       <!-- Behavior Settings -->
       <div class="setting-group">
-        <label class="setting-label">Behavior</label>
+        <h3 class="setting-label">Behavior</h3>
         
         <div class="setting-item">
-          <label class="label cursor-pointer justify-start gap-3">
-            <input type="checkbox" class="toggle" bind:checked={settings.autoBackspace} on:change={() => settings.preset = 'custom'} />
-            <span>
-              <span class="font-medium">Auto-backspace last word on over-limit</span>
+          <label class="toggle-label">
+            <input type="checkbox" class="toggle-input" bind:checked={settings.autoBackspace} on:change={() => settings.preset = 'custom'} />
+            <span class="toggle-slider"></span>
+            <span class="toggle-text">
+              <span class="toggle-title">Auto-backspace last word on over-limit</span>
               <div class="setting-description">Automatically removes the last word when syllable limit is exceeded</div>
             </span>
           </label>
         </div>
         
         <div class="setting-item">
-          <label class="label cursor-pointer justify-start gap-3">
-            <input type="checkbox" class="toggle" bind:checked={settings.enableShake} on:change={() => settings.preset = 'custom'} />
-            <span>
-              <span class="font-medium">Enable shake animation</span>
+          <label class="toggle-label">
+            <input type="checkbox" class="toggle-input" bind:checked={settings.enableShake} on:change={() => settings.preset = 'custom'} />
+            <span class="toggle-slider"></span>
+            <span class="toggle-text">
+              <span class="toggle-title">Enable shake animation</span>
               <div class="setting-description">Shake the editor when limits are reached</div>
             </span>
           </label>
@@ -291,7 +296,7 @@
     </label>
           <!-- Indicator mode dropdown replaced by expandable options -->
           <div class="setting-item">
-            <label class="setting-label">Syllable indicator</label>
+            <h3 class="setting-label">Syllable indicator</h3>
             <div class="poem-type-grid">
               <button class="poem-type-option {settings.indicatorMode === 'count' ? 'selected' : ''}" on:click={() => { settings.indicatorMode = 'count'; settings.preset = 'custom'; }}>
                 <div class="poem-type-name">Count</div>
@@ -583,12 +588,7 @@
   }
   
   /* Radio group styles */
-  .setting-label-inline {
-    font-weight: 600;
-    color: var(--text-primary);
-    display: block;
-    margin-bottom: 12px;
-  }
+  /* unused: .setting-label-inline */
   
   .radio-group {
     display: flex;
@@ -686,35 +686,15 @@
   }
   
   /* Inline panel styles */
-  .settings-panel-content {
-    height: 100%;
-    background: var(--bg-primary);
-    display: flex;
-    flex-direction: column;
-    border-radius: 12px;
-    border: 1px solid var(--border-color);
-    overflow: hidden;
-  }
+  /* unused: .settings-panel-content ... */
   
-  .settings-panel-content .settings-header {
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-  }
+  /* unused */
   
-  .settings-panel-content .settings-content {
-    flex: 1;
-    overflow-y: auto;
-  }
+  /* unused */
   
-  .settings-panel-content .close-button {
-    color: #6b7280;
-  }
+  /* unused */
   
-  .settings-panel-content .close-button:hover {
-    background: #e5e7eb;
-  }
+  /* unused */
   
-  .hidden {
-    display: none;
-  }
+  /* unused: .hidden */
 </style>

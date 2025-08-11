@@ -50,15 +50,15 @@
 
 {#if show}
   <div class="fixed top-4 right-4 z-50 animate-scale-in">
-    <div class="alert shadow-lg">
+    <div class="alert shadow-lg {styles[type]}">
       {#if type === 'success'}
-        <CheckCircle class="w-5 h-5 text-success" />
+        <CheckCircle class="w-5 h-5 {iconStyles.success}" />
       {:else if type === 'error'}
-        <XCircle class="w-5 h-5 text-error" />
+        <XCircle class="w-5 h-5 {iconStyles.error}" />
       {:else if type === 'warning'}
-        <AlertCircle class="w-5 h-5 text-warning" />
+        <AlertCircle class="w-5 h-5 {iconStyles.warning}" />
       {:else}
-        <Info class="w-5 h-5 text-info" />
+        <Info class="w-5 h-5 {iconStyles.info}" />
       {/if}
       <span class="font-medium">{message}</span>
       <button

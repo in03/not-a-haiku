@@ -1,50 +1,42 @@
 <script>
-  // @ts-nocheck
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { createEventDispatcher, onMount, tick } from 'svelte';
   import { validateHaiku, countHaikuSyllables, initializeSyllableCounter } from '../onnx-syllable-counter.js';
-  import confetti from 'canvas-confetti';
   import { settingsStore, defaultSettings } from '$lib/stores/settings.js';
   import { poemTypes } from '../poemTypes.js';
-  
+
+  export let title = '';
   export let content = '';
-  export let placeholder = '';
-  export let validation = { isValid: false, isComplete: false, feedback: '' };
   
   const dispatch = createEventDispatcher();
   
-  // Settings state
-  let settings = { ...defaultSettings };
-  // subscribe to centralized settings
-  const unsubscribeSettings = settingsStore.subscribe((s) => settings = s);
-  // Settings managed via header /settings route only
-  $: isFocusMode = settings.preset === 'focus' || !!settings.hideHeader;
-  
-  /** @type {Record<string, any>} */
-  const poemTypesDict = /** @type {any} */ (poemTypes);
-  $: expectedSyllables = poemTypesDict[settings.poemType].syllables;
-  $: maxLines = expectedSyllables.length;
-  
-  // Focus mode progress calculation
-  $: totalExpectedSyllables = expectedSyllables.reduce((sum, count) => sum + count, 0);
-  $: totalCurrentSyllables = syllableCounts.reduce((sum, count) => sum + count, 0);
-  $: progressPercentage = Math.min(100, (totalCurrentSyllables / totalExpectedSyllables) * 100);
-  $: isProgressComplete = totalCurrentSyllables === totalExpectedSyllables;
-  $: isProgressOverLimit = totalCurrentSyllables > totalExpectedSyllables;
-  
-  // Responsive container height based on poem length
-  $: editorRows = Math.max(6, maxLines + 2);
-  // Base chrome height + per-row estimate; clamp to reasonable bounds
-  $: containerMinHeight = Math.min(900, Math.max(420, Math.floor(260 + editorRows * 28)));
-  
-  // Dark mode handled globally in +layout via theme.js
-  
-  let textarea;
+  /** @type {typeof defaultSettings} */
+  let settings = defaultSettings;
+  let step = 'title'; // 'title' or 'content'
+  /** @type {HTMLTextAreaElement} */
+  let textareaElement;
+  /** @type {HTMLDivElement} */
+  let containerElement;
+  /** @type {number[]} */
   let syllableCounts = [];
+  let isExpanded = false;
+  
+  // Input handling state from HaikuEditor
   let isShaking = false;
-  let isFocused = false;
-  let ephemeralMessage = '';
-  let ephemeralTimer;
-  let isErrorPulseActive = false;
+  let isProcessingOverLimit = false;
+  let lastValidationTime = 0;
+  let isInputBlocked = false;
+  let isTemporarilyBlocked = false;
+  let isLockedOverLimit = false;
+  let lastWordSubmissionValidation = '';
+  
+  // Subscribe to settings
+  const unsubscribeSettings = settingsStore.subscribe((s) => settings = s);
+  
+  // Get current poem type configuration
+  $: currentPoemType = poemTypes[/** @type {keyof typeof poemTypes} */(settings.poemType || 'haiku')] || poemTypes.haiku;
+  $: expectedSyllables = currentPoemType.syllables;
+  $: expectedLines = expectedSyllables.length;
+  $: maxLines = expectedLines;
   
   // Initialize syllable counts based on poem type
   $: {
@@ -52,33 +44,34 @@
       syllableCounts = new Array(maxLines).fill(0);
     }
   }
-  let isProcessingOverLimit = false;
-  let lastValidationTime = 0;
-  let hasTriggeredConfetti = false;
-  let isInputBlocked = false;
-  let isTemporarilyBlocked = false;
-  let isLockedOverLimit = false;
-  let lastWordSubmissionValidation = '';
-
+  
   // When auto-backspace is disabled, lock input (except navigation/deletion) while over the limit
   $: isLockedOverLimit = !settings.autoBackspace && syllableCounts.some((count, index) => count > expectedSyllables[index]);
   $: isInputBlocked = isTemporarilyBlocked || isLockedOverLimit;
-
-  // Ensure user still sees a shake once when lock engages
-  let hasShakenForLock = false;
-  $: if (isLockedOverLimit && !hasShakenForLock) {
-    hasShakenForLock = true;
-    if (settings.enableShake) {
-      shakeWindow();
+  
+  // Calculate dynamic height based on poem type
+  $: titleHeight = 60; // Height for title input
+  $: lineHeight = 32; // Approximate height per line
+  $: padding = 24; // Container padding
+  $: expandedHeight = titleHeight + (expectedLines * lineHeight) + padding + 40; // Extra space for title when shrunk
+  
+  // Handle title submission
+  async function handleTitleSubmit() {
+    if (!title.trim()) return;
+    
+    step = 'content';
+    isExpanded = true;
+    
+    // Focus the textarea after expansion
+    await tick();
+    if (textareaElement) {
+      textareaElement.focus();
     }
-  }
-  $: if (!isLockedOverLimit && hasShakenForLock) {
-    hasShakenForLock = false;
   }
   
   // Reactive syllable counting (predictive, real-time)
   $: {
-    if (content !== undefined) {
+    if (content !== undefined && step === 'content') {
       updateSyllableCounts(content).catch(error => {
         console.error('Syllable counting error:', error);
       });
@@ -86,12 +79,13 @@
   }
   
   // Predictive syllable counting for real-time feedback
+  /** @param {string} text */
   async function updateSyllableCounts(text) {
     try {
       syllableCounts = await countHaikuSyllables(text, expectedSyllables);
       dispatch('syllables', { counts: syllableCounts, expected: expectedSyllables });
       // Ensure overall validation reacts to any content change (not only on spaces)
-      const overall = await validateHaiku(text, expectedSyllables, poemTypes[settings.poemType].name);
+      const overall = await validateHaiku(text, expectedSyllables, currentPoemType.name);
       dispatch('validation', overall);
     } catch (error) {
       console.error('Syllable counting error:', error);
@@ -99,25 +93,9 @@
       dispatch('validation', { isValid: false, isComplete: false, feedback: '' });
     }
   }
-
-  // Ephemeral microcopy for focus mode
-  $: if (isFocusMode && validation) {
-    // Show soft, non-judgmental microcopy briefly
-    if (validation.isComplete) {
-      showEphemeral('Complete');
-    } else if (validation.feedback) {
-      const msg = validation.feedback.replace(/too many syllables/i, 'A syllable too far.');
-      showEphemeral(msg);
-    }
-  }
-
-  function showEphemeral(message) {
-    clearTimeout(ephemeralTimer);
-    ephemeralMessage = message;
-    ephemeralTimer = setTimeout(() => (ephemeralMessage = ''), 1500);
-  }
   
   // Word submission validation - only triggered when space is pressed
+  /** @param {string} text */
   async function validateWordSubmission(text) {
     const now = performance.now();
     lastValidationTime = now;
@@ -134,24 +112,15 @@
           handleOverLimit();
         }, 50);
       } else if (hasOverLimit) {
-        if (isFocusMode && settings.enableGentleErrorPulse) {
-          // Trigger a brief error pulse via class binding
-          isErrorPulseActive = false;
-          requestAnimationFrame(() => {
-            isErrorPulseActive = true;
-            setTimeout(() => (isErrorPulseActive = false), 250);
-          });
-        } else if (settings.enableShake) {
+        if (settings.enableShake) {
           // Just shake if auto-backspace is disabled but shake is enabled
           shakeWindow();
         }
       }
       
       // Dispatch validation result
-      const validation = await validateHaiku(text, expectedSyllables, poemTypes[settings.poemType].name);
+      const validation = await validateHaiku(text, expectedSyllables, currentPoemType.name);
       dispatch('validation', validation);
-      
-      // Don't trigger confetti automatically - only on manual submission
       
       // Store the text for this validation to avoid duplicate validations
       lastWordSubmissionValidation = text;
@@ -162,6 +131,7 @@
     }
   }
   
+  /** @param {string} text @param {number} cursorPos */
   function getCurrentLineIndex(text, cursorPos) {
     const beforeCursor = text.substring(0, cursorPos);
     const lineBreaks = (beforeCursor.match(/\n/g) || []).length;
@@ -172,10 +142,9 @@
     if (isProcessingOverLimit) return;
     
     isProcessingOverLimit = true;
-
     
-    if (textarea) {
-      const currentPos = textarea.selectionStart;
+    if (textareaElement) {
+      const currentPos = textareaElement.selectionStart;
       const currentLineIndex = getCurrentLineIndex(content, currentPos);
       
       if (currentPos > 0 && currentLineIndex >= 0) {
@@ -189,16 +158,15 @@
         
         // If we're at exactly the right syllables and it's a complete word
         if (syllableCounts[currentLineIndex] === expectedSyllables[currentLineIndex] && !isPartialWord) {
-  
           // Move to next line if not the last line
-          if (currentLineIndex < 2) {
+          if (currentLineIndex < maxLines - 1) {
             const beforeCursor = content.substring(0, currentPos);
             const afterCursor = content.substring(currentPos);
             content = beforeCursor + '\n' + afterCursor;
             
             // Set cursor position after the newline
             setTimeout(() => {
-              textarea.setSelectionRange(currentPos + 1, currentPos + 1);
+              textareaElement.setSelectionRange(currentPos + 1, currentPos + 1);
             }, 0);
           }
         } else {
@@ -221,7 +189,7 @@
           // Move cursor to end of rebuilt line
           const newPos = lineStart + rebuiltLine.length;
           setTimeout(() => {
-            textarea.setSelectionRange(newPos, newPos);
+            textareaElement.setSelectionRange(newPos, newPos);
           }, 0);
         }
         
@@ -236,8 +204,35 @@
     }, 100);
   }
   
+  function shakeWindow() {
+    if (!settings.enableShake || isShaking) {
+      return;
+    }
+    
+    isShaking = true;
+    isTemporarilyBlocked = true;
+    
+    // Shake animation ends after 500ms
+    setTimeout(() => {
+      isShaking = false;
+    }, 500);
+    
+    // Input blocking continues for 1 second total
+    setTimeout(() => {
+      isTemporarilyBlocked = false;
+    }, 1000);
+  }
+  
+  // Handle keydown events with full HaikuEditor logic
+  /** @param {KeyboardEvent} event */
   function handleKeydown(event) {
-    if (!textarea) return;
+    if (step === 'title' && event.key === 'Enter') {
+      event.preventDefault();
+      handleTitleSubmit();
+      return;
+    }
+    
+    if (step !== 'content' || !textareaElement) return;
     
     // Block all input during the no-input period
     if (isInputBlocked) {
@@ -254,9 +249,7 @@
       }
     }
     
-    const cursorPos = textarea.selectionStart;
-    
-
+    const cursorPos = textareaElement.selectionStart;
     
     // Allow special keys
     const allowedKeys = [
@@ -266,7 +259,6 @@
     ];
     
     if (allowedKeys.includes(event.key)) {
-
       return;
     }
     
@@ -285,7 +277,6 @@
     }
     
     // Filter input to alphabetical characters and basic punctuation only
-    // Allowed: letters, spaces, newlines, apostrophes, periods, commas, semicolons, colons, exclamation, question marks, hyphens
     if (event.key.length === 1) { // Only check single character inputs
       const allowedCharPattern = /[a-zA-Z\s\n'.,;:!?\-\(\)]/;
       if (!allowedCharPattern.test(event.key)) {
@@ -296,7 +287,6 @@
     
     // Get current line info
     const currentLineIndex = getCurrentLineIndex(content, cursorPos);
-
     
     // Only enforce on lines within the poem structure
     if (currentLineIndex >= maxLines) {
@@ -305,8 +295,6 @@
     
     const expectedSyll = expectedSyllables[currentLineIndex];
     const currentSyll = syllableCounts[currentLineIndex] || 0;
-    
-
     
     // Check if we're at a word boundary (space or newline before cursor)
     const isAtWordBoundary = cursorPos === 0 || 
@@ -337,7 +325,7 @@
             content = beforeSpace + '\n' + afterSpace;
             
             setTimeout(() => {
-              textarea.setSelectionRange(spacePos + 1, spacePos + 1);
+              textareaElement.setSelectionRange(spacePos + 1, spacePos + 1);
             }, 0);
           }
         }, 10);
@@ -356,7 +344,7 @@
         content = beforeCursor + '\n' + afterCursor;
         
         setTimeout(() => {
-          textarea.setSelectionRange(cursorPos + 1, cursorPos + 1);
+          textareaElement.setSelectionRange(cursorPos + 1, cursorPos + 1);
         }, 0);
       } else {
         // At last line limit - shake to indicate no more lines
@@ -366,33 +354,9 @@
       }
       return;
     }
-    
-    // Allow typing to continue - syllable counting is predictive
-    // Word submission validation will handle enforcement when space is pressed
-    
-    // Allow input if under the limit
-
   }
   
-  function shakeWindow() {
-    if (!settings.enableShake || isShaking) {
-      return;
-    }
-    
-    isShaking = true;
-    isTemporarilyBlocked = true;
-    
-    // Shake animation ends after 500ms
-    setTimeout(() => {
-      isShaking = false;
-    }, 500);
-    
-    // Input blocking continues for 1 second total
-    setTimeout(() => {
-      isTemporarilyBlocked = false;
-    }, 1000);
-  }
-  
+  /** @param {ClipboardEvent} event */
   function handlePaste(event) {
     event.preventDefault();
     
@@ -403,224 +367,230 @@
     });
   }
   
-  // Track poemType changes from global settings; clear editor to avoid mixed structure
-  let lastPoemType = settings.poemType;
-  $: if (lastPoemType !== settings.poemType) {
-    lastPoemType = settings.poemType;
-    if (content.trim()) {
-      content = '';
-      syllableCounts = new Array(maxLines).fill(0);
+  // Auto-resize textarea based on content
+  function autoResize() {
+    if (textareaElement) {
+      textareaElement.style.height = 'auto';
+      textareaElement.style.height = Math.max(expectedLines * lineHeight, textareaElement.scrollHeight) + 'px';
     }
   }
   
-  // Manual submission function
-  async function submitPoem() {
+  // Reset function
+  export function reset() {
+    step = 'title';
+    isExpanded = false;
+    title = '';
+    content = '';
+    syllableCounts = [];
+  }
+  
+  onMount(async () => {
     try {
-      const validation = await validateHaiku(content, expectedSyllables, poemTypes[settings.poemType].name);
-      
-      if (validation.isComplete && settings.enableConfetti) {
-        confetti({
-          particleCount: 50,
-          spread: 60,
-          origin: { y: 0.6 },
-          colors: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57']
-        });
-      }
-      
-      dispatch('submit', validation);
+      await initializeSyllableCounter();
     } catch (error) {
-      console.error('Submission error:', error);
-    }
-  }
-  
-  // Watch for over-limit conditions only after word submission validation
-  // This is now more lenient and only triggers enforcement on completed words
-  
-  let systemPrefersDark = false;
-  onMount(() => {
-    (async () => {
-      try {
-        await initializeSyllableCounter();
-      } catch (error) {
-        console.error('Failed to initialize ONNX syllable counter:', error);
-      }
-    })();
-
-    // Check system dark mode preference
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      systemPrefersDark = mediaQuery.matches;
-      const handleChange = (e) => {
-        systemPrefersDark = e.matches;
-      };
-      mediaQuery.addEventListener('change', handleChange);
-      // Cleanup listener on component destroy
-      return () => {
-        mediaQuery.removeEventListener('change', handleChange);
-      };
-    }
-
-    if (textarea) {
-      textarea.focus();
+      console.error('Failed to initialize syllable counter:', error);
     }
   });
-
+  
+  // Cleanup
   import { onDestroy } from 'svelte';
   onDestroy(() => unsubscribeSettings());
 </script>
 
-
-
-<!-- Editor Container -->
-<div class="editor-container" style="min-height: {containerMinHeight}px;">
-  <div class="editor-panel">
-    <div class="relative {isShaking ? 'animate-shake' : ''} {isInputBlocked ? 'opacity-50 pointer-events-none' : ''} {isFocusMode ? 'focus-mode' : ''}">
-      
-      
-      <!-- Progress indicator (focus mode only) -->
-        {#if isFocusMode && settings.showProgressBar}
-        <div class="progress-container">
-          <div class="progress-bar {isProgressComplete ? 'complete' : isProgressOverLimit ? 'over-limit' : 'in-progress'}" style="transform: scaleX({progressPercentage / 100});"></div>
-        </div>
+<div 
+  bind:this={containerElement}
+  class="unified-input-container"
+  class:expanded={isExpanded}
+  class:animate-shake={isShaking}
+  style="--title-height: {titleHeight}px; --expanded-height: {expandedHeight}px; --expected-lines: {expectedLines};"
+>
+  <!-- Title when expanded (shrunk and positioned top-left) -->
+  {#if step === 'content' && title}
+    <div class="title-shrunk">
+      {title}
+    </div>
+  {/if}
+  
+  <!-- Unified text input -->
+  <div class="input-wrapper" class:content-mode={step === 'content'}>
+    {#if step === 'title'}
+      <input
+        bind:value={title}
+        on:keydown={handleKeydown}
+        placeholder={`Enter your ${currentPoemType.name.toLowerCase()} title...`}
+        class="title-input"
+        autocomplete="off"
+        aria-label={`${currentPoemType.name} title`}
+      />
+      {#if title.trim()}
+        <button 
+          class="submit-button"
+          on:click={handleTitleSubmit}
+          aria-label={`Start writing ${currentPoemType.name.toLowerCase()}`}
+        >
+          →
+        </button>
       {/if}
-      
-      <!-- Poem editor -->
+    {:else}
       <textarea
-        bind:this={textarea}
+        bind:this={textareaElement}
         bind:value={content}
+        on:input={autoResize}
+        on:focus={() => autoResize()}
         on:keydown={handleKeydown}
         on:paste={handlePaste}
-        on:focus={() => (isFocused = true)}
-        on:blur={() => (isFocused = false)}
-        placeholder={placeholder || `Write your ${poemTypesDict[settings.poemType].name.toLowerCase()} here...`}
-        class="w-full bg-transparent border-none focus:ring-0 focus:outline-none resize-none text-lg leading-relaxed p-0 {isErrorPulseActive ? 'error-pulse' : ''}"
-        rows={Math.max(6, maxLines + 2)}
+        placeholder="Write your {currentPoemType.name.toLowerCase()} here..."
+        class="content-textarea {isInputBlocked ? 'opacity-50 pointer-events-none' : ''}"
+        rows={expectedLines}
         autocomplete="off"
         spellcheck="false"
       ></textarea>
-
-      {#if isFocusMode}
-        <!-- Line guide on focus -->
-        {#if settings.lineGuideOnFocus && isFocused}
-          <div class="line-guide">Line {getCurrentLineIndex(content, textarea?.selectionStart || 0) + 1} of {maxLines}</div>
-        {/if}
-
-        <!-- Ephemeral microcopy -->
-        {#if ephemeralMessage}
-          <div class="ephemeral">{ephemeralMessage}</div>
-        {/if}
-      {/if}
-    </div>
-    
-    
+    {/if}
   </div>
 </div>
 
 <style>
-  /* Settings container with slide transition */
-  .editor-container {
+  .unified-input-container {
     position: relative;
-    overflow: hidden;
     width: 100%;
-    min-height: 500px;
-    height: auto;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    transition: background-color 0.3s, color 0.3s;
-  }
-  
-  .editor-panel {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    min-height: 100%;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .editor-panel { transform: translateX(0); }
-
-  textarea {
-    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-    line-height: 1.8;
-  }
-  
-  /* Pruned legacy classes */
-  
-  
-  
-  
-  
-  
-  
-  /* Focus mode styles */
-  .focus-mode {
-    position: relative;
-  }
-  /* Gentle error pulse for focus mode */
-  .error-pulse {
-    animation: pulseBorder 200ms ease-in-out 2;
-  }
-  @keyframes pulseBorder {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.0); }
-    50% { box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25); }
-  }
-  
-  
-  
-  .progress-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: var(--bg-tertiary);
-    border-radius: 2px 2px 0 0;
+    height: var(--title-height);
+    background: var(--bg-primary, #ffffff);
+    border: 2px solid var(--border-color, #e5e7eb);
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
   }
   
-  .progress-bar {
+  .unified-input-container.expanded {
+    height: var(--expanded-height);
+    padding-top: 50px; /* Make room for shrunk title */
+  }
+  
+  /* Keep container border always visible - don't hide on focus/hover */
+  
+  .title-shrunk {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--text-primary, #1f2937);
+    opacity: 0;
+    transform: translateY(10px);
+    animation: slideInTitle 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
+  }
+  
+  @keyframes slideInTitle {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .input-wrapper {
+    position: relative;
+    width: 100%;
     height: 100%;
-    transform-origin: left center;
-    transition: transform 0.3s ease, background-color 0.2s ease;
-    border-radius: 2px 2px 0 0;
+    display: flex;
+    align-items: center;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
-  .progress-bar.in-progress {
-    background: linear-gradient(90deg, #3b82f6, #06b6d4);
+  .input-wrapper.content-mode {
+    align-items: flex-start;
+    padding-top: 8px;
   }
   
-  .progress-bar.complete {
-    background: linear-gradient(90deg, #10b981, #059669);
+  .title-input,
+  .content-textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none !important;
+    font-family: inherit;
+    color: var(--text-primary, #1f2937);
+    resize: none;
   }
   
-  .progress-bar.over-limit {
-    background: linear-gradient(90deg, #f59e0b, #d97706);
+  /* Ensure NO outlines on focus for any input/textarea */
+  .title-input:focus,
+  .content-textarea:focus {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
   }
   
-  .focus-textarea {
-    border-top: 3px solid transparent;
-    border-radius: 0 0 8px 8px;
-    outline: none;
-  }
-
-  .line-guide {
-    margin-top: 8px;
-    font-size: 12px;
-    color: var(--text-tertiary);
-  }
-
-  .ephemeral {
-    margin-top: 6px;
-    font-size: 12px;
-    color: var(--text-secondary);
-    opacity: 0.9;
+  .title-input {
+    font-size: 24px;
+    text-align: center;
+    font-weight: 500;
   }
   
-  /* Responsive styles */
-  @media (max-width: 768px) { .btn { width: 100%; justify-content: center; } }
+  .title-input::placeholder {
+    color: var(--text-tertiary, #9ca3af);
+  }
   
-  @media (max-width: 480px) { }
+  .content-textarea {
+    font-size: 18px;
+    line-height: 1.8;
+    min-height: calc(var(--expected-lines) * 32px);
+  }
+  
+  .content-textarea::placeholder {
+    color: var(--text-tertiary, #9ca3af);
+  }
+  
+  .submit-button {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    background: var(--primary-color, #3b82f6);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition: all 0.2s ease;
+  }
+  
+  .submit-button:hover {
+    background: var(--primary-hover, #2563eb);
+    transform: translateY(-50%) scale(1.05);
+  }
+  
+  /* Shake animation */
+  .animate-shake {
+    animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+  
+  @keyframes shake {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
+  }
+  
+  /* Dark mode support */
+  @media (prefers-color-scheme: dark) {
+    .unified-input-container {
+      background: var(--bg-primary, #1f2937);
+      border-color: var(--border-color, #374151);
+    }
+    
+    .title-input,
+    .content-textarea {
+      color: var(--text-primary, #f9fafb);
+    }
+    
+    .title-shrunk {
+      color: var(--text-primary, #f9fafb);
+    }
+  }
 </style>

@@ -3,3 +3,4 @@ alwaysApply: true
 ---
 
 - Always use pnpm > npm
+- Generally, don't start the dev server. It will probably already be running. If you need to run a test, check for and kill any running instances first.

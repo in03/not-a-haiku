@@ -48,7 +48,7 @@
     <h1 class="text-xl font-semibold">Settings</h1>
     {#if saved}<span class="badge badge-success badge-outline">Saved</span>{/if}
   </div>
-  <div class="card bg-base-100 shadow">
+  <div class="card shadow">
     <div class="card-body p-0">
       <Settings isModal={false} bind:settings on:close={handleClose} />
     </div>

@@ -118,4 +118,76 @@
     background: color-mix(in srgb, #3b82f6 12%, transparent);
     border: 1px solid color-mix(in srgb, #3b82f6 25%, transparent);
   }
+
+  /* Native replacements for former DaisyUI utilities */
+  /* Buttons */
+  .btn { @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-150 select-none; }
+  .btn { @apply bg-neutral-100 text-neutral-900 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700; }
+  .btn-primary { @apply bg-emerald-500 text-white hover:bg-emerald-600; }
+  .btn-ghost { @apply bg-transparent text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800; }
+  .btn-outline { @apply bg-transparent border border-neutral-300 text-neutral-900 hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-800; }
+  .btn-sm { @apply text-sm px-3 py-1.5; }
+  .btn-xs { @apply text-xs px-2 py-1; }
+  .btn-disabled, .btn:disabled { @apply opacity-50 cursor-not-allowed; }
+  .btn-active { @apply bg-neutral-200 dark:bg-neutral-700; }
+
+  /* Grouped buttons */
+  .join { @apply inline-flex; }
+  .join-item { @apply rounded-none first:rounded-l-lg last:rounded-r-lg -ml-px first:ml-0 border border-neutral-300 dark:border-neutral-700; }
+
+  /* Badges */
+  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+  .badge { @apply bg-neutral-100 text-neutral-700 border border-neutral-300 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700; }
+  .badge-outline { @apply bg-transparent; }
+  .badge-success { @apply bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-700; }
+  .badge-ghost { @apply bg-transparent text-neutral-500 border-neutral-300 dark:text-neutral-400 dark:border-neutral-700; }
+
+  /* Cards */
+  .card { @apply rounded-2xl border border-neutral-200 dark:border-neutral-700 shadow-sm bg-[var(--bg-primary)] text-[color:var(--text-primary)]; }
+  .card-body { @apply p-6; }
+  .card-footer { @apply border-t border-neutral-200 dark:border-neutral-700 p-4; }
+
+  /* Inputs */
+  .input { @apply w-full px-3 py-2 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 outline-none; }
+  .input-bordered { @apply border border-neutral-300 dark:border-neutral-700 focus:ring-2 focus:ring-emerald-400; }
+  .input-lg { @apply text-base sm:text-lg py-3; }
+
+  /* Textareas */
+  .textarea { @apply w-full p-3 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 outline-none; }
+  .textarea-bordered { @apply border border-neutral-300 dark:border-neutral-700 focus:ring-2 focus:ring-emerald-400; }
+
+  /* Alerts */
+  .alert { @apply flex items-center gap-2 rounded-lg border px-3 py-2 bg-neutral-50 border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700; }
+
+  /* Navbar tokens */
+  .navbar { @apply flex items-center justify-between; }
+  .navbar-start { @apply flex items-center; }
+  .navbar-center { @apply flex items-center justify-center; }
+  .navbar-end { @apply flex items-center justify-end; }
+
+  /* Theme token shims (former DaisyUI) */
+  .bg-base-100 { background-color: var(--bg-primary); }
+  .text-base-content { color: var(--text-primary); }
+  .border-base-300 { border-color: var(--border-color); }
+
+  /* Semantic text colors used in Toast */
+  .text-success { @apply text-green-500; }
+  .text-error { @apply text-red-500; }
+  .text-warning { @apply text-yellow-500; }
+  .text-info { @apply text-blue-500; }
+
+  /* Drawer / sidebar */
+  .drawer-overlay {
+    @apply fixed inset-0 bg-black/50 z-40;
+    backdrop-filter: blur(2px);
+  }
+  .drawer-panel {
+    @apply fixed top-0 right-0 h-full w-64 bg-neutral-900 text-neutral-100 z-50 p-4 border-l border-neutral-800;
+    box-shadow: -10px 0 30px rgba(0,0,0,0.3);
+    animation: slideIn 180ms ease-out;
+  }
+  @keyframes slideIn {
+    from { transform: translateX(20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
 }

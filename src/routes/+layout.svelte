@@ -1,49 +1,43 @@
 <script>
   import '../app.css';
-  import { onMount } from 'svelte';
-  import { initTheme, themeMode, setThemeMode, applyTheme } from '$lib/theme.js';
+  import { Menu, X, Settings as SettingsIcon, Github, BookOpen } from 'lucide-svelte';
   import { settingsStore } from '$lib/stores/settings.js';
+  import { getPoemType } from '$lib/poemTypes.js';
+  let isMenuOpen = false;
 
-  /** @type {'auto'|'on'|'off'} */
-  let currentTheme = 'auto';
+  function openMenu() { isMenuOpen = true; }
+  function closeMenu() { isMenuOpen = false; }
 
-  onMount(() => {
-    initTheme();
-    const unsub = themeMode.subscribe((m) => {
-      /** @type {'auto'|'on'|'off'} */
-      // @ts-ignore - runtime store can only hold these strings
-      const mode = m;
-      currentTheme = mode;
-      applyTheme(mode);
-    });
-    return () => unsub();
-  });
-
-  /** @param {'auto'|'on'|'off'} mode */
-  function selectTheme(mode) {
-    setThemeMode(mode);
-  }
+  /** @param {string} word */
+  const articleFor = (word) => /^(a|e|i|o|u)/i.test(word || '') ? 'an' : 'a';
+  $: poem = getPoemType($settingsStore?.poemType || 'haiku');
+  $: poemName = poem?.name || 'Haiku';
+  $: poemNameLower = poemName.toLowerCase();
+  $: poemArticle = articleFor(poemNameLower);
 </script>
 
 <header class="w-full border-b border-base-300 bg-base-100 text-base-content">
   <div class="container mx-auto px-4 py-3">
     <div class="navbar p-0">
       <div class="navbar-start">
-        <a href="/" class="font-semibold text-base-content">Not a Haiku</a>
+        <a href="/" class="font-semibold text-base-content">Not {poemArticle} {poemName}</a>
       </div>
-      <div class="navbar-center hidden sm:flex">
-        <nav class="flex items-center gap-2 text-sm">
-          <a href="/settings" class="btn btn-sm btn-ghost">Settings</a>
-          <a href="https://github.com/" class="btn btn-sm btn-ghost" rel="noopener noreferrer" target="_blank">GitHub</a>
-          <a href="/docs" class="btn btn-sm btn-ghost">Docs</a>
-        </nav>
-      </div>
+      <div class="navbar-center hidden sm:flex"></div>
       <div class="navbar-end flex items-center gap-2">
-        <div class="join hidden md:inline-flex">
-          <button class="btn btn-xs btn-ghost join-item {currentTheme === 'auto' ? 'btn-active' : ''}" on:click={() => selectTheme('auto')}>Auto</button>
-          <button class="btn btn-xs btn-ghost join-item {currentTheme === 'off' ? 'btn-active' : ''}" on:click={() => selectTheme('off')}>Light</button>
-          <button class="btn btn-xs btn-ghost join-item {currentTheme === 'on' ? 'btn-active' : ''}" on:click={() => selectTheme('on')}>Dark</button>
-        </div>
+        <nav class="hidden sm:flex items-center gap-2">
+          <a href="/settings" class="btn btn-sm btn-ghost" aria-label="Settings" title="Settings">
+            <SettingsIcon class="w-4 h-4" />
+          </a>
+          <a href="https://github.com/" class="btn btn-sm btn-ghost" rel="noopener noreferrer" target="_blank" aria-label="GitHub" title="GitHub">
+            <Github class="w-4 h-4" />
+          </a>
+          <a href="/docs" class="btn btn-sm btn-ghost" aria-label="Docs" title="Docs">
+            <BookOpen class="w-4 h-4" />
+          </a>
+        </nav>
+        <button class="btn btn-sm btn-ghost sm:hidden" aria-label="Open menu" on:click={openMenu}>
+          <Menu class="w-5 h-5" />
+        </button>
       </div>
     </div>
   </div>
@@ -52,3 +46,29 @@
 <main class="min-h-screen bg-base-100 text-base-content">
   <slot />
 </main>
+
+{#if isMenuOpen}
+  <div class="drawer-overlay" role="button" tabindex="0" aria-label="Close menu" on:click={closeMenu} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && closeMenu()}></div>
+  <div class="drawer-panel" role="dialog" aria-modal="true" aria-label="Menu" tabindex="0" on:keydown={(e) => e.key === 'Escape' && closeMenu()}>
+    <div class="flex items-center justify-between mb-4">
+      <span class="text-sm text-neutral-400">Menu</span>
+      <button class="btn btn-xs btn-ghost" aria-label="Close" on:click={closeMenu}>
+        <X class="w-4 h-4" />
+      </button>
+    </div>
+    <nav class="flex flex-col gap-2">
+      <a href="/settings" class="btn btn-ghost" on:click={closeMenu}>
+        <SettingsIcon class="w-4 h-4" />
+        <span class="ml-2">Settings</span>
+      </a>
+      <a href="https://github.com/" class="btn btn-ghost" rel="noopener noreferrer" target="_blank" on:click={closeMenu}>
+        <Github class="w-4 h-4" />
+        <span class="ml-2">GitHub</span>
+      </a>
+      <a href="/docs" class="btn btn-ghost" on:click={closeMenu}>
+        <BookOpen class="w-4 h-4" />
+        <span class="ml-2">Docs</span>
+      </a>
+    </nav>
+  </div>
+{/if}

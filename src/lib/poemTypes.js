@@ -15,7 +15,7 @@ export const poemTypes = {
     syllables: [5, 7, 5, 7, 7]
   },
   cinquain: {
-    name: 'Cinquain (American)',
+    name: 'Cinquain',
     description: 'American - Adelaide Crapsey',
     syllables: [2, 4, 6, 8, 2]
   },

@@ -1,11 +1,7 @@
-// DaisyUI-only setup
-
-/******************************************
- * Tailwind Configuration
- ******************************************/
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{html,js,svelte,ts}'],
+  darkMode: 'class',
   theme: {
     extend: {
       animation: {
@@ -30,10 +26,7 @@ module.exports = {
       }
     }
   },
-  plugins: [require('@tailwindcss/forms'), require('daisyui')],
-  daisyui: {
-    themes: ['coffee', 'emerald', 'pastel', 'light', 'dark']
-  }
+  plugins: [require('@tailwindcss/forms')]
 };
 
 

@@ -26,6 +26,25 @@ export default {
     }
   },
   plugins: [
-    require('@tailwindcss/forms')
-  ]
+    require('@tailwindcss/forms'),
+    require('daisyui')
+  ],
+  daisyui: {
+    themes: [
+      {
+        haiku: {
+          primary: '#16a34a',
+          secondary: '#60a5fa',
+          accent: '#22d3ee',
+          neutral: '#111827',
+          'base-100': '#ffffff',
+          info: '#38bdf8',
+          success: '#22c55e',
+          warning: '#f59e0b',
+          error: '#ef4444'
+        }
+      },
+      'light'
+    ]
+  }
 };

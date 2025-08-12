@@ -201,49 +201,27 @@
         setTimeout(() => {
           textarea.setSelectionRange(cursorPos + 1, cursorPos + 1);
         }, 0);
-      } else {
-        // At line 3 limit - shake to indicate no more lines
-        shakeWindow();
       }
       return;
     }
     
-    // Allow typing to continue - validation will catch up and handle over-limit
-    if (currentSyll > expectedSyll && !isAtWordBoundary) {
-      console.log('Over syllable limit, but allowing input - validation will catch up');
-      // Don't prevent default - let the user keep typing
-      shakeWindow();
-      return;
+    // Block extra characters when over syllable limit per line
+    if (currentSyll >= expectedSyll) {
+      if (event.key.length === 1 && !isAtWordBoundary) {
+        console.log('Character blocked at limit');
+        event.preventDefault();
+        handleOverLimit();
+        return;
+      }
     }
-    
-    // Allow input if under the limit
-    console.log('Under syllable limit, allowing input');
   }
   
   function shakeWindow() {
-    if (isShaking) {
-      console.log('Shake already in progress, skipping');
-      return;
-    }
-    
-    console.log('Shaking window');
+    if (isShaking) return;
     isShaking = true;
-    
     setTimeout(() => {
       isShaking = false;
     }, 500);
-  }
-  
-  // Watch for over-limit conditions after validation
-  $: {
-    if (syllableCounts.some((count, index) => count > expectedSyllables[index])) {
-      // Delay to allow typing to complete
-      setTimeout(() => {
-        if (syllableCounts.some((count, index) => count > expectedSyllables[index])) {
-          handleOverLimit();
-        }
-      }, 50);
-    }
   }
   
   onMount(async () => {
@@ -263,9 +241,9 @@
 
 <div class="relative {isShaking ? 'animate-shake' : ''}">
   <!-- Syllable indicators -->
-  <div class="flex gap-2 mb-4">
+  <div class="flex flex-wrap gap-2 mb-4">
     {#each syllableCounts as count, index}
-      <div class="syllable-indicator {count === expectedSyllables[index] ? 'syllable-perfect' : count > expectedSyllables[index] ? 'syllable-over' : 'syllable-under'}">
+      <div class="badge badge-lg {count === expectedSyllables[index] ? 'badge-success' : count > expectedSyllables[index] ? 'badge-error' : 'badge-info'}">
         Line {index + 1}: {count}/{expectedSyllables[index]}
       </div>
     {/each}
@@ -277,7 +255,7 @@
     bind:value={content}
     on:keydown={handleKeydown}
     {placeholder}
-    class="zen-textarea"
+    class="textarea textarea-bordered w-full h-48"
     rows="6"
     autocomplete="off"
     spellcheck="false"

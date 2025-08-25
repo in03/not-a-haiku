@@ -3,6 +3,7 @@
   import { Menu, X, Settings as SettingsIcon, Github, BookOpen } from 'lucide-svelte';
   import { settingsStore } from '$lib/stores/settings.js';
   import { getPoemType } from '$lib/poemTypes.js';
+  import { base } from '$app/paths';
   let isMenuOpen = false;
 
   function openMenu() { isMenuOpen = true; }
@@ -20,12 +21,12 @@
   <div class="container mx-auto px-4 py-3">
     <div class="navbar p-0">
       <div class="navbar-start">
-        <a href="/" class="font-semibold text-base-content site-title-link">Not {poemArticle} {poemName}</a>
+        <a href="{base}/" class="font-semibold text-base-content site-title-link">Not {poemArticle} {poemName}</a>
       </div>
       <div class="navbar-center hidden sm:flex"></div>
       <div class="navbar-end flex items-center gap-2">
         <nav class="hidden sm:flex items-center gap-2">
-          <a href="/settings" class="btn btn-sm btn-ghost" aria-label="Settings" title="Settings">
+          <a href="{base}/settings" class="btn btn-sm btn-ghost" aria-label="Settings" title="Settings">
             <SettingsIcon class="w-4 h-4" />
           </a>
           <a href="https://github.com/in03/not-a-haiku" class="btn btn-sm btn-ghost" rel="noopener noreferrer" target="_blank" aria-label="GitHub" title="GitHub">
@@ -66,7 +67,7 @@
       </button>
     </div>
     <nav class="flex flex-col gap-2">
-      <a href="/settings" class="btn btn-ghost" on:click={closeMenu}>
+      <a href="{base}/settings" class="btn btn-ghost" on:click={closeMenu}>
         <SettingsIcon class="w-4 h-4" />
         <span class="ml-2">Settings</span>
       </a>
@@ -74,7 +75,7 @@
         <Github class="w-4 h-4" />
         <span class="ml-2">GitHub</span>
       </a>
-      <a href="https://en.wikipedia.org/wiki/Haiku" class="btn btn-ghost" on:click={closeMenu}>
+      <a href="https://en.wikipedia.org/wiki/Haiku" class="btn btn-ghost" rel="noopener noreferrer" target="_blank" on:click={closeMenu}>
         <BookOpen class="w-4 h-4" />
         <span class="ml-2">Docs</span>
       </a>

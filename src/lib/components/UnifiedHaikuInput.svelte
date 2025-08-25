@@ -9,6 +9,9 @@
   
   const dispatch = createEventDispatcher();
   
+  // Track validation state for submit button
+  let validation = { isValid: false, isComplete: false, feedback: '' };
+  
   /** @type {typeof defaultSettings} */
   let settings = defaultSettings;
   let step = 'title'; // 'title' or 'content'
@@ -69,6 +72,29 @@
     }
   }
   
+  // Handle haiku submission
+  function handleHaikuSubmit() {
+    if (validation.isValid && validation.isComplete) {
+      dispatch('haikuSubmit', { 
+        title, 
+        content, 
+        isComplete: validation.isComplete 
+      });
+    }
+  }
+  
+  // Dispatch cursor position for scrolling indicators
+  function dispatchCursorPosition() {
+    if (!textareaElement) return;
+    
+    const cursorPos = textareaElement.selectionStart;
+    const beforeCursor = content.substring(0, cursorPos);
+    const lineBreaks = (beforeCursor.match(/\n/g) || []).length;
+    const currentLine = Math.min(lineBreaks, maxLines - 1);
+    
+    dispatch('cursorMove', { cursorLine: currentLine });
+  }
+  
   // Reactive syllable counting (predictive, real-time)
   $: {
     if (content !== undefined && step === 'content') {
@@ -86,6 +112,7 @@
       dispatch('syllables', { counts: syllableCounts, expected: expectedSyllables });
       // Ensure overall validation reacts to any content change (not only on spaces)
       const overall = await validateHaiku(text, expectedSyllables, currentPoemType.name);
+      validation = overall; // Store for submit button state
       dispatch('validation', overall);
     } catch (error) {
       console.error('Syllable counting error:', error);
@@ -119,15 +146,17 @@
       }
       
       // Dispatch validation result
-      const validation = await validateHaiku(text, expectedSyllables, currentPoemType.name);
-      dispatch('validation', validation);
+      const validationResult = await validateHaiku(text, expectedSyllables, currentPoemType.name);
+      validation = validationResult; // Store for submit button state
+      dispatch('validation', validationResult);
       
       // Store the text for this validation to avoid duplicate validations
       lastWordSubmissionValidation = text;
       
     } catch (error) {
       console.error('Validation error:', error);
-      dispatch('validation', { isValid: false, isComplete: false, feedback: 'Validation error' });
+      validation = { isValid: false, isComplete: false, feedback: 'Validation error' };
+      dispatch('validation', validation);
     }
   }
   
@@ -236,7 +265,7 @@
     
     // Block all input during the no-input period
     if (isInputBlocked) {
-      // Still allow navigation and deletion keys during blocking
+      // Allow navigation and deletion keys during blocking
       const allowedDuringBlock = [
         'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
         'Home', 'End', 'PageUp', 'PageDown',
@@ -251,7 +280,7 @@
     
     const cursorPos = textareaElement.selectionStart;
     
-    // Allow special keys
+    // Allow special keys (including navigation)
     const allowedKeys = [
       'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
       'Home', 'End', 'PageUp', 'PageDown',
@@ -259,6 +288,10 @@
     ];
     
     if (allowedKeys.includes(event.key)) {
+      // Dispatch cursor position for navigation keys
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
+        setTimeout(() => dispatchCursorPosition(), 0);
+      }
       return;
     }
     
@@ -333,8 +366,15 @@
       return;
     }
     
-    // Handle ENTER - strict line limit enforcement
+    // Handle ENTER - submit if haiku is complete, otherwise strict line limit enforcement
     if (event.key === 'Enter') {
+      // If haiku is complete, submit it
+      if (validation.isValid && validation.isComplete) {
+        event.preventDefault();
+        handleHaikuSubmit();
+        return;
+      }
+      
       // Count existing newlines
       const newlineCount = (content.match(/\n/g) || []).length;
       
@@ -450,12 +490,27 @@
         on:focus={() => autoResize()}
         on:keydown={handleKeydown}
         on:paste={handlePaste}
+        on:click={dispatchCursorPosition}
+        on:keyup={dispatchCursorPosition}
         placeholder="Write your {currentPoemType.name.toLowerCase()} here..."
         class="content-textarea {isInputBlocked ? 'opacity-50 pointer-events-none' : ''}"
         rows={expectedLines}
         autocomplete="off"
         spellcheck="false"
       ></textarea>
+      
+      <!-- Submit button for completed haiku -->
+      {#if validation.isValid && validation.isComplete}
+        <button 
+          class="haiku-submit-button"
+          on:click={handleHaikuSubmit}
+          aria-label="Submit {currentPoemType.name.toLowerCase()}"
+          title="Submit your {currentPoemType.name.toLowerCase()}"
+        >
+          <span class="submit-text">submit</span>
+          <span class="submit-tick">✓</span>
+        </button>
+      {/if}
     {/if}
   </div>
 </div>
@@ -576,6 +631,60 @@
   .submit-button:hover {
     background: var(--primary-hover, #2563eb);
     transform: translateY(-50%) scale(1.05);
+  }
+  
+  /* Haiku submit button - appears at bottom right corner when valid */
+  .haiku-submit-button {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    height: 32px;
+    padding: 0 12px;
+    background: #10b981; /* Green-500 */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: submitButtonAppear 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .haiku-submit-button:hover {
+    background: #059669; /* Green-600 */
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+  }
+  
+  .haiku-submit-button:active {
+    transform: scale(0.98);
+  }
+  
+  .submit-text {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
+  .submit-tick {
+    font-size: 12px;
+    font-weight: bold;
+  }
+  
+  @keyframes submitButtonAppear {
+    0% {
+      opacity: 0;
+      transform: scale(0.5) translateY(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
   }
   
   /* Shake animation */

@@ -21,6 +21,8 @@
   let celebrationIndex = 0;
   /** @type {any} */
   let unifiedInputComponent;
+  /** @type {HTMLDivElement | null} */
+  let syllableScrollContainer = null;
   
   const celebrationMessages = [
     "Well done",
@@ -72,9 +74,10 @@
       // Trigger confetti if enabled
       if ($settingsStore.enableConfetti) {
         confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 }
+          particleCount: 150,
+          spread: 80,
+          startVelocity: 80,
+          origin: { y: 1.2 } // Position below viewport
         });
       }
       
@@ -95,6 +98,35 @@
     showToast = true;
     toastMessage = event.detail.message;
     toastType = event.detail.type;
+  }
+  
+  // Auto-scroll to current line indicator based on cursor position
+  /** @param {number} lineIndex */
+  function scrollToLineIndicator(lineIndex) {
+    if (!syllableScrollContainer || lineIndex < 0) return;
+    
+    // Find the badge element for the specified line
+    const badges = syllableScrollContainer.children;
+    if (badges[lineIndex]) {
+      const badge = /** @type {HTMLElement} */ (badges[lineIndex]);
+      const containerWidth = syllableScrollContainer.offsetWidth;
+      const badgeLeft = badge.offsetLeft;
+      const badgeWidth = badge.offsetWidth;
+      
+      // Calculate scroll position to center the current badge
+      const scrollLeft = badgeLeft - (containerWidth / 2) + (badgeWidth / 2);
+      
+      syllableScrollContainer.scrollTo({
+        left: Math.max(0, scrollLeft),
+        behavior: 'smooth'
+      });
+    }
+  }
+  
+  // Handle cursor position changes from the input component
+  /** @param {CustomEvent<{ cursorLine: number }>} event */
+  function handleCursorMove(event) {
+    scrollToLineIndicator(event.detail.cursorLine);
   }
   
 
@@ -121,7 +153,7 @@
     <div class="relative min-h-[44px] py-1 overflow-visible">
       {#if !(content && expectedSyllables.length)}
         <div class="absolute inset-0 flex items-center justify-center gap-2 text-xs"
-          in:fade={{ duration: 500, easing: cubicOut }}
+          in:fly={{ x: -20, duration: 400, easing: cubicOut }}
           out:fly={{ x: -20, duration: 400, easing: cubicOut }}
         >
           <div class="badge badge-ghost">calm 🌿</div>
@@ -131,22 +163,26 @@
       {/if}
 
       {#if content && expectedSyllables.length && !validation.isComplete}
-        <div class="absolute inset-0 flex items-center justify-center gap-2 text-xs"
-          in:fade={{ duration: 500, easing: cubicOut }}
+        <div class="syllable-indicator-container"
+          in:fly={{ x: 20, duration: 400, easing: cubicOut }}
           out:fly={{ x: 20, duration: 400, easing: cubicOut }}
         >
-          {#each expectedSyllables as expected, index}
-            <div class="badge {syllableCounts[index] > expected ? 'badge-error' : syllableCounts[index] === expected ? 'badge-success' : 'badge-ghost'}">
-              {syllableCounts[index] || 0}/{expected}
-            </div>
-          {/each}
+          <div class="syllable-indicator-scroll" bind:this={syllableScrollContainer}>
+            {#each expectedSyllables as expected, index}
+              <div class="badge {syllableCounts[index] > expected ? 'badge-error' : syllableCounts[index] === expected ? 'badge-success' : 'badge-ghost'}">
+                {syllableCounts[index] || 0}/{expected}
+              </div>
+            {/each}
+          </div>
+          <div class="fade-left"></div>
+          <div class="fade-right"></div>
         </div>
       {/if}
       
       {#if validation.isComplete}
         <div class="absolute inset-0 flex items-center justify-center text-xs"
-          in:fade={{ duration: 500, easing: cubicOut }}
-          out:fly={{ x: 20, duration: 400, easing: cubicOut }}
+          in:fly={{ x: 20, duration: 400, easing: cubicOut }}
+          out:fly={{ x: -20, duration: 400, easing: cubicOut }}
         >
           <div class="badge badge-success">{celebrationMessages[celebrationIndex]} ✨</div>
         </div>
@@ -163,6 +199,8 @@
       on:validation={handleValidation}
       on:syllables={handleSyllables}
       on:toast={handleToast}
+      on:haikuSubmit={handleSubmit}
+      on:cursorMove={handleCursorMove}
     />
 
     <!-- Features row -->
@@ -190,6 +228,64 @@
   
   .animate-fade-in {
     animation: fade-in 0.8s ease-out;
+  }
+  
+  /* Responsive syllable indicator container */
+  .syllable-indicator-container {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  
+  .syllable-indicator-scroll {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    text-align: center;
+    font-size: 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: 0 32px; /* Space for fade edges */
+    max-width: 100%;
+  }
+  
+  .syllable-indicator-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Fade edges */
+  .fade-left, .fade-right {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 32px;
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  .fade-left {
+    left: 0;
+    background: linear-gradient(to right, var(--bg-primary, #ffffff), transparent);
+  }
+  
+  .fade-right {
+    right: 0;
+    background: linear-gradient(to left, var(--bg-primary, #ffffff), transparent);
+  }
+  
+  /* Dark mode support for fade edges */
+  @media (prefers-color-scheme: dark) {
+    .fade-left {
+      background: linear-gradient(to right, var(--bg-primary, #1f2937), transparent);
+    }
+    
+    .fade-right {
+      background: linear-gradient(to left, var(--bg-primary, #1f2937), transparent);
+    }
   }
   
   /* removed decorative leaves */

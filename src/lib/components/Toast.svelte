@@ -9,14 +9,15 @@
   
   const dispatch = createEventDispatcher();
   
-  let timeout;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let timeout = null;
   
-  const icons = {
+  const icons = /** @type {const} */ ({
     success: CheckCircle,
     error: XCircle,
     warning: AlertCircle,
     info: Info
-  };
+  });
   
   const styles = {
     success: 'bg-green-50 border-green-200 text-green-800',
@@ -33,7 +34,7 @@
   };
   
   $: if (show && duration > 0) {
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
     timeout = setTimeout(() => {
       show = false;
       dispatch('close');
@@ -41,7 +42,7 @@
   }
   
   function close() {
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
     show = false;
     dispatch('close');
   }
@@ -49,12 +50,20 @@
 
 {#if show}
   <div class="fixed top-4 right-4 z-50 animate-scale-in">
-    <div class="flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg backdrop-blur-sm {styles[type]}">
-      <svelte:component this={icons[type]} class="w-5 h-5 {iconStyles[type]}" />
+    <div class="alert shadow-lg {styles[type]}">
+      {#if type === 'success'}
+        <CheckCircle class="w-5 h-5 {iconStyles.success}" />
+      {:else if type === 'error'}
+        <XCircle class="w-5 h-5 {iconStyles.error}" />
+      {:else if type === 'warning'}
+        <AlertCircle class="w-5 h-5 {iconStyles.warning}" />
+      {:else}
+        <Info class="w-5 h-5 {iconStyles.info}" />
+      {/if}
       <span class="font-medium">{message}</span>
       <button
         on:click={close}
-        class="ml-2 p-1 rounded-full hover:bg-black/10 transition-colors"
+        class="btn btn-sm btn-ghost ml-2"
         aria-label="Close"
       >
         <XCircle class="w-4 h-4" />

@@ -1,0 +1,58 @@
+---
+description: When designing frontend components, adjust UI or UX.
+alwaysApply: false
+---
+
+# Minimal Zen Tailwind Style Guide
+# Purpose: For a haiku editor UI that is calm, minimal, and distraction-free.
+# Inspired by Linear and GitHub, but simpler.
+
+## General Rules
+- Prioritize whitespace over visible dividers; use padding and spacing instead of lines when possible.
+- Use a muted, neutral palette with occasional, soft accent tones.
+- Typography is primary: ensure comfortable reading with ample line height.
+- Hover and focus states should be subtle, never jarring.
+- Keep visual noise low: avoid heavy shadows, gradients, or unnecessary borders.
+
+## Colors
+- Background: `bg-neutral-50` (light) / `bg-neutral-900` (dark)
+- Surface: `bg-white` / `bg-neutral-800`
+- Text primary: `text-neutral-900` / `text-neutral-100`
+- Text secondary: `text-neutral-500` / `text-neutral-400`
+- Accent: A single soft color (e.g., `emerald-500` or `sky-500`) used sparingly.
+
+## Typography
+- Font: Clean, humanist sans-serif (e.g., Inter, system-ui).
+- Size:
+  - Body: `text-base` (16px)
+  - Small: `text-sm`
+  - Headings: `text-xl` or `text-2xl`, semibold
+- Line height: Comfortable (`leading-relaxed`).
+
+## Borders & Corners
+- Default: Minimal or no borders.
+- If used: `border border-neutral-200` (light) / `border border-neutral-700` (dark)
+- Radius: `rounded-lg` for cards/inputs. Avoid fully rounded unless necessary.
+
+## Spacing
+- Padding inside containers: `p-4`
+- Gap between elements: `gap-4` for flex/grid layouts
+- Page margins: `mx-auto max-w-prose` for text-heavy sections
+
+## Interactive Elements
+### Buttons
+- Base:
+  - `px-4 py-2 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-900` (light)
+- Accent:
+  - `bg-emerald-500 text-white hover:bg-emerald-600`
+### Inputs / Textareas
+- `border border-neutral-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-400 outline-none`
+- Comfortable typing size: `p-3`
+
+## Example Layout
+```html
+<div class="min-h-screen bg-neutral-50 text-neutral-900 flex flex-col items-center p-8">
+  <main class="w-full max-w-prose space-y-6">
+    <h1 class="text-2xl font-semibold">Haiku Editor</h1>
+    <textarea
+      class="w-full p-3 rounded-lg border border-neutral

@@ -1,6 +1,12 @@
 /**
  * ONNX-based syllable counter using dictionary lookup with ML fallback
  * Similar to the Elixir implementation but for JavaScript/SvelteKit
+ * 
+ * Verbose logging shows:
+ * - Dict lookup vs ML inference timing
+ * - Character encoding for ML model input
+ * - Raw ML output values before rounding
+ * - Overall haiku validation timing
  */
 
 import * as ort from 'onnxruntime-web';
@@ -10,6 +16,12 @@ import modelMetadata from '../ml/model_metadata.json';
 // Model session cache
 let modelSession = null;
 let isModelLoaded = false;
+
+// Verbose logging that respects Chrome dev tools log level
+function verboseLog(...args) {
+  // Use console.debug which respects Chrome's "Verbose" log level setting
+  console.debug('[VERBOSE]', ...args);
+}
 
 /**
  * Initialize ONNX model session
@@ -24,13 +36,7 @@ async function initializeModel() {
     isModelLoaded = true;
     console.log('ONNX syllable model loaded successfully');
     
-    // Debug: log model input/output info
-    console.log('Model inputs:', modelSession.inputNames);
-    console.log('Model outputs:', modelSession.outputNames);
-    console.log('Model input metadata:', modelSession.inputNames.map(name => ({
-      name,
-      shape: modelSession.inputNames.includes(name) ? modelSession.inputNames : 'unknown'
-    })));
+
   } catch (error) {
     console.error('Failed to load ONNX model:', error);
     throw new Error('ML model initialization failed');
@@ -80,6 +86,9 @@ async function mlSyllableCount(word) {
       await initializeModel();
     }
     
+    const cleanWord = word.toLowerCase().replace(/[^a-z'-]/g, '');
+    verboseLog(`ML encoding: "${cleanWord}" -> [${cleanWord.split('').join(', ')}]`);
+    
     // Preprocess input
     const inputTensor = preprocessWord(word);
     const inputShape = [1, modelMetadata.character_encoding.max_word_length, modelMetadata.character_encoding.alphabet_size];
@@ -89,19 +98,17 @@ async function mlSyllableCount(word) {
     
     // Get the correct input name from the model
     const inputName = modelSession.inputNames[0];
-    console.log('Using input name:', inputName);
+
     
     // Run inference
     const feeds = { [inputName]: input };
     const results = await modelSession.run(feeds);
     
-    // Debug: log the results structure
-    console.log('ONNX results:', results);
-    console.log('ONNX results keys:', Object.keys(results));
+
     
     // Get output - use the correct output name from the model
     const outputName = modelSession.outputNames[0];
-    console.log('Using output name:', outputName);
+
     let output = results[outputName];
     
     if (!output) {
@@ -109,10 +116,9 @@ async function mlSyllableCount(word) {
       throw new Error('ONNX model output not found');
     }
     
-    console.log('ONNX output:', output);
-    console.log('ONNX output data:', output.data);
-    
-    const syllableCount = Math.round(output.data[0]);
+    const rawOutput = output.data[0];
+    const syllableCount = Math.round(rawOutput);
+    verboseLog(`ML raw output: ${rawOutput.toFixed(4)} -> ${syllableCount} syllables`);
     
     // Ensure minimum 1 syllable
     return Math.max(1, syllableCount);
@@ -184,17 +190,34 @@ async function countWordSyllables(word, isComplete) {
   
   if (cleanWord.length === 0) return 0;
   
+  const startTime = performance.now();
+  
   if (isComplete) {
+    // Special rule: Single letters are treated as words (1 syllable) when complete
+    // This addresses the acronym vs word ambiguity mentioned in syllable-quirks.md
+    if (cleanWord.length === 1) {
+      verboseLog(`Single letter rule: "${cleanWord}" = 1 syllable (complete word)`);
+      return 1;
+    }
+    
     // Complete word: Use dictionary first, ML fallback
     const dictResult = cmuDict[cleanWord];
     if (dictResult !== undefined) {
+      const dictTime = performance.now() - startTime;
+      verboseLog(`Dict lookup: "${cleanWord}" = ${dictResult} syllables (${dictTime.toFixed(2)}ms)`);
       return dictResult;
     }
     // Unknown complete word: use ML fallback
-    return await mlSyllableCount(cleanWord);
+    const mlResult = await mlSyllableCount(cleanWord);
+    const mlTime = performance.now() - startTime;
+    verboseLog(`ML inference: "${cleanWord}" = ${mlResult} syllables (${mlTime.toFixed(2)}ms)`);
+    return mlResult;
   } else {
     // Partial word: Always use ML for real-time feedback
-    return await mlSyllableCount(cleanWord);
+    const mlResult = await mlSyllableCount(cleanWord);
+    const mlTime = performance.now() - startTime;
+    verboseLog(`ML inference (partial): "${cleanWord}" = ${mlResult} syllables (${mlTime.toFixed(2)}ms)`);
+    return mlResult;
   }
 }
 
@@ -222,43 +245,59 @@ export async function countSyllables(text) {
 }
 
 /**
- * Count syllables for haiku lines (returns array of counts)
+ * Count syllables for poem lines (returns array of counts)
  */
-export async function countHaikuSyllables(content) {
+export async function countHaikuSyllables(content, expectedSyllables = [5, 7, 5]) {
   if (!content || content.trim().length === 0) {
-    return [0, 0, 0];
+    return new Array(expectedSyllables.length).fill(0);
   }
   
+  const startTime = performance.now();
   const lines = content.split(/\r?\n/);
   const syllableCounts = [];
   
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < expectedSyllables.length; i++) {
     const line = lines[i] || '';
     const result = await countSyllables(line.trim());
     syllableCounts.push(result.total);
   }
   
+  const totalTime = performance.now() - startTime;
+  verboseLog(`Poem validation: [${syllableCounts.join(', ')}] vs [${expectedSyllables.join(', ')}] (${totalTime.toFixed(2)}ms total)`);
+  
   return syllableCounts;
 }
 
 /**
- * Validate haiku structure and provide feedback
+ * Validate poem structure and provide feedback
  */
-export async function validateHaiku(content) {
-  const syllableCounts = await countHaikuSyllables(content);
-  const expectedSyllables = [5, 7, 5];
-  const lines = content.split(/\r?\n/).slice(0, 3);
+export async function validateHaiku(content, expectedSyllables = [5, 7, 5], poemType = 'haiku') {
+  const syllableCounts = await countHaikuSyllables(content, expectedSyllables);
+  const lines = content.split(/\r?\n/).slice(0, expectedSyllables.length);
   
-  // Check if valid haiku
-  const isValid = syllableCounts.every((count, index) => count === expectedSyllables[index]);
-  const isComplete = lines.every(line => line.trim().length > 0) && isValid;
+  // Require all required lines to exist and be non-empty
+  const hasAllRequiredLines =
+    lines.length === expectedSyllables.length && lines.every((line) => line.trim().length > 0);
+
+  // Structure match across all expected lines
+  const structureMatches = syllableCounts.every((count, index) => count === expectedSyllables[index]);
+
+  // A poem is considered valid only when complete (prevents partial poems from being "valid")
+  const isComplete = hasAllRequiredLines && structureMatches;
+  const isValid = isComplete;
   
   // Generate feedback
   let feedback = '';
   if (isComplete) {
-    feedback = "Perfect haiku! You're a natural poet.";
-  } else if (isValid && lines.some(line => line.trim().length === 0)) {
-    feedback = "Great syllable structure! Finish all three lines.";
+    feedback = `Perfect ${poemType}! You're a natural poet.`;
+  } else if (!hasAllRequiredLines) {
+    // Encourage finishing all lines when partial structure looks ok so far
+    const presentLines = lines.filter((l) => l.trim().length > 0).length;
+    if (presentLines > 0) {
+      feedback = `Great start! Finish all ${expectedSyllables.length} lines.`;
+    } else {
+      feedback = `Write your ${poemType}...`;
+    }
   } else {
     const issues = [];
     syllableCounts.forEach((count, index) => {
@@ -272,7 +311,7 @@ export async function validateHaiku(content) {
         }
       }
     });
-    feedback = issues.length > 0 ? issues[0] : "Keep writing your haiku...";
+    feedback = issues.length > 0 ? issues[0] : `Keep writing your ${poemType}...`;
   }
   
   return {

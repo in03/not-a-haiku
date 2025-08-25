@@ -1,0 +1,24 @@
+---
+alwaysApply: true
+---
+
+# UX Principles for Cursor
+## Goal
+Ensure any UI generated is consistent, intuitive, and usable, following core UX principles regardless of requested style.
+
+## Rules
+1. Maintain consistency in layout, typography, and interactions.
+2. Prioritize clarity: avoid ambiguity in labels, buttons, or navigation.
+3. Follow established usability heuristics (Nielsen Norman Group) and accessibility guidelines (WCAG AA).
+4. Reduce cognitive load: limit simultaneous options; use progressive disclosure when possible.
+5. Make interactive elements obvious and easy to hit (Fitts’ Law).
+6. Ensure responsive layouts work across desktop, tablet, and mobile.
+7. Avoid unnecessary complexity, even if the user requests it. Suggest simpler, more effective alternatives while preserving the spirit of the request.
+8. Provide reasoning when deviating from an explicit request due to usability concerns.
+9. Never sacrifice accessibility for visual design.
+
+## Behavior
+If the user requests a design choice that would hurt usability (e.g., poor contrast, hidden essential controls, inconsistent patterns):
+- Politely explain the issue.
+- Suggest an alternative that keeps the user’s intent.
+- Apply the alternative unless the user explicitly overrides after the explanation.

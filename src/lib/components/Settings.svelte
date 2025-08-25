@@ -17,13 +17,13 @@
   };
   // Removed optional focus-only fields (no longer configurable)
 
-  import { presets } from '$lib/stores/settings.js';
+  import { presets, settingsStore } from '$lib/stores/settings.js';
 
-  // Apply preset when selected
-  $: if (settings.preset === 'default' || settings.preset === 'focus') {
-    const base = presets[settings.preset] || {};
-    // keep poemType selection while applying preset behaviors
-    settings = { ...settings, ...base, poemType: settings.poemType, preset: settings.preset };
+  // Handle preset changes by using the store's applyPreset method
+  let lastPreset = settings.preset;
+  $: if (settings.preset !== lastPreset && (settings.preset === 'default' || settings.preset === 'focus')) {
+    settingsStore.applyPreset(settings.preset);
+    lastPreset = settings.preset;
   }
   
   let poemTypeExpanded = false;
@@ -40,6 +40,7 @@
   /** @param {string} key */
   function selectPoemType(key) {
     settings.poemType = key;
+    settings.preset = 'custom';
     poemTypeExpanded = false;
   }
   
@@ -244,6 +245,11 @@
     display: flex;
     flex-direction: column;
     position: relative;
+  }
+  
+  .settings-content-wrapper {
+    border-radius: inherit;
+    overflow: hidden;
   }
   
   .settings-header {

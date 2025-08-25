@@ -129,6 +129,19 @@
     scrollToLineIndicator(event.detail.cursorLine);
   }
   
+  // Calculate progress for progressive underline
+  $: progressPercentage = (() => {
+    if (!$settingsStore.showProgressBar || !expectedSyllables.length || !syllableCounts.length) {
+      return 0;
+    }
+    
+    let totalExpected = expectedSyllables.reduce((sum, count) => sum + count, 0);
+    let totalCurrent = syllableCounts.reduce((sum, count) => sum + count, 0);
+    
+    // Cap at 100% to avoid over-progress
+    return Math.min((totalCurrent / totalExpected) * 100, 100);
+  })();
+  
 
 </script>
 
@@ -140,7 +153,8 @@
 <div class="container mx-auto px-4 py-8 min-h-screen">
   <!-- Header copy -->
   <div class="text-center mb-8 animate-fade-in">
-    <div class="flex items-center justify-center gap-3 mb-3">
+    <div class="flex items-center justify-center gap-3 mb-3 relative progress-title {$settingsStore.showProgressBar && progressPercentage > 0 ? 'show-progress' : ''}" 
+         style="--progress: {progressPercentage}%">
       <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r {validation.isValid ? 'from-green-400 to-emerald-500' : 'from-sky-400 to-blue-500'} bg-clip-text text-transparent transition-all duration-500">
         {validation.isValid ? `It's ${poemArticle} ${poemName}!` : `Not ${poemArticle} ${poemName}`}
       </h1>
@@ -286,6 +300,30 @@
     .fade-right {
       background: linear-gradient(to left, var(--bg-primary, #1f2937), transparent);
     }
+  }
+  
+  /* Progressive underline for title */
+  .progress-title {
+    display: inline-flex;
+    position: relative;
+  }
+  
+  .progress-title::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    height: 3px;
+    width: var(--progress);
+    background: linear-gradient(90deg, #10b981, #059669);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    opacity: 0;
+  }
+  
+  /* Show progress underline when enabled and there's progress */
+  .progress-title.show-progress::after {
+    opacity: 1;
   }
   
   /* removed decorative leaves */

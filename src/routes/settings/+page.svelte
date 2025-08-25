@@ -1,16 +1,14 @@
 <script>
   import Settings from '$lib/components/Settings.svelte';
-  import Toast from '$lib/components/Toast.svelte';
   import { settingsStore } from '$lib/stores/settings.js';
+  import { base } from '$app/paths';
+  import { ArrowLeft } from 'lucide-svelte';
 
   /** @type {import('$lib/stores/settings.js').defaultSettings} */
   let settings;
   const unsubscribe = settingsStore.subscribe((s) => settings = { ...s });
 
   let saved = false;
-  let showToast = false;
-  let toastMessage = '';
-  let toastType = 'success';
   /** @type {ReturnType<typeof setTimeout> | null} */
   let autosaveTimer = null;
   let lastSaved = JSON.stringify(settings);
@@ -23,20 +21,18 @@
         settingsStore.set({ ...settings });
         lastSaved = JSON.stringify(settings);
         saved = true;
-        showToast = true;
-        toastMessage = 'Settings saved';
-        toastType = 'success';
         setTimeout(() => (saved = false), 1500);
       }, 250);
     }
   }
 
-  function resetToDefaults() {
-    settingsStore.reset();
-    // subscription will update local settings, autosave effect will run
+  function handleBack() { 
+    history.back(); 
   }
 
-  function handleClose() { history.back(); }
+  function handleClose() { 
+    history.back(); 
+  }
 
   // Cleanup subscription on destroy
   import { onDestroy } from 'svelte';
@@ -45,18 +41,17 @@
 
 <section class="container mx-auto px-4 py-6">
   <div class="flex items-center justify-between mb-4">
-    <h1 class="text-xl font-semibold">Settings</h1>
+    <div class="flex items-center gap-3">
+      <button class="btn btn-ghost btn-sm" on:click={handleBack} aria-label="Go back">
+        <ArrowLeft class="w-4 h-4" />
+      </button>
+      <h1 class="text-xl font-semibold">Settings</h1>
+    </div>
     {#if saved}<span class="badge badge-success badge-outline">Saved</span>{/if}
   </div>
   <div class="card shadow">
     <div class="card-body p-0">
       <Settings isModal={false} bind:settings on:close={handleClose} />
     </div>
-    <div class="card-footer flex items-center justify-end gap-2 text-sm">
-      <button class="btn btn-outline" on:click={resetToDefaults}>Reset to defaults</button>
-      <a href="/" class="btn btn-primary">Done</a>
-    </div>
   </div>
 </section>
-
-<Toast bind:show={showToast} message={toastMessage} type={toastType} on:close={() => (showToast = false)} />

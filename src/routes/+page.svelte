@@ -42,61 +42,43 @@
   $: poemNameLower = poemName.toLowerCase();
   $: poemArticle = articleFor(poemNameLower);
   
+  // no decorative leaves
+  
   /** @param {CustomEvent<{ isValid: boolean, isComplete: boolean, feedback: string }>} event */
   function handleValidation(event) {
     const previousValid = validation.isValid;
     validation = event.detail;
     
     // Cycle celebration message when haiku becomes valid
-    if (validation.isValid && !previousValid) {
+    if (!previousValid && validation.isValid) {
       celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
     }
   }
-
+  
   /** @param {CustomEvent<{ counts: number[], expected: number[] }>} event */
   function handleSyllables(event) {
-    syllableCounts = event.detail.counts || [];
-    expectedSyllables = event.detail.expected || [];
+    syllableCounts = event.detail.counts;
+    expectedSyllables = event.detail.expected;
   }
   
-  function submitHaiku() {
-    if (validation.isComplete) {
-      // Launch epic confetti celebration!
-      const duration = 3 * 1000;
-      const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
-      /** @param {number} min @param {number} max */
-      function randomInRange(min, max) {
-        return Math.random() * (max - min) + min;
-      }
-
-      const interval = setInterval(function() {
-        const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval);
-        }
-
-        const particleCount = 50 * (timeLeft / duration);
-        
-        // since particles fall down, start a bit higher than random
-        confetti(Object.assign({}, defaults, {
-          particleCount,
-          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
-        }));
-        confetti(Object.assign({}, defaults, {
-          particleCount,
-          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
-        }));
-      }, 250);
-      
-      // Show success toast
+  /** @param {CustomEvent<any>} event */
+  async function handleSubmit(event) {
+    if (event.detail.isComplete) {
+      // Show success message
       showToast = true;
-      toastMessage = `✨ "${title}" submitted successfully! Your ${poemNameLower} is beautiful.`;
+      toastMessage = celebrationMessages[celebrationIndex];
       toastType = 'success';
       
-      // Reset after success
+      // Trigger confetti if enabled
+      if ($settingsStore.enableConfetti) {
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+      
+      // Reset after delay
       setTimeout(() => {
         if (unifiedInputComponent) {
           unifiedInputComponent.reset();
@@ -114,10 +96,12 @@
     toastMessage = event.detail.message;
     toastType = event.detail.type;
   }
+  
+
 </script>
 
 <svelte:head>
-  <title>Haiku Studio - Interactive poem assistant</title>
+  <title>Not a Haiku - Haiku assistance and stuff</title>
   <meta name="description" content={`Write beautiful ${poemNameLower} with real-time syllable counting`} />
 </svelte:head>
 
@@ -140,40 +124,38 @@
           in:fade={{ duration: 500, easing: cubicOut }}
           out:fly={{ x: -20, duration: 400, easing: cubicOut }}
         >
-          <div class="badge badge-ghost">calm</div>
-          <div class="badge badge-ghost">minimal</div>
-          <div class="badge badge-ghost">zen</div>
+          <div class="badge badge-ghost">calm 🌿</div>
+          <div class="badge badge-ghost">minimal 🌱</div>
+          <div class="badge badge-ghost">zen 🌵</div>
         </div>
       {/if}
 
       {#if content && expectedSyllables.length && !validation.isComplete}
         <div class="absolute inset-0 flex items-center justify-center gap-2 text-xs"
-          in:fly={{ x: 20, duration: 500, easing: cubicOut }}
+          in:fade={{ duration: 500, easing: cubicOut }}
+          out:fly={{ x: 20, duration: 400, easing: cubicOut }}
         >
           {#each expectedSyllables as expected, index}
-            <div class="syllable-indicator {syllableCounts[index] > expected ? 'syllable-over' : syllableCounts[index] === expected ? 'syllable-perfect' : 'syllable-under'}">
-              {#if syllableCounts[index] !== undefined}
-                {syllableCounts[index]}/{expected}
-              {:else}
-                0/{expected}
-              {/if}
+            <div class="badge {syllableCounts[index] > expected ? 'badge-error' : syllableCounts[index] === expected ? 'badge-success' : 'badge-ghost'}">
+              {syllableCounts[index] || 0}/{expected}
             </div>
           {/each}
         </div>
       {/if}
-
-      {#if content && expectedSyllables.length && validation.isComplete}
-        <div class="absolute inset-0 flex items-center justify-center"
-          in:fly={{ x: 20, duration: 400, easing: cubicOut }}
+      
+      {#if validation.isComplete}
+        <div class="absolute inset-0 flex items-center justify-center text-xs"
+          in:fade={{ duration: 500, easing: cubicOut }}
+          out:fly={{ x: 20, duration: 400, easing: cubicOut }}
         >
-          <button class="btn btn-sm btn-primary" on:click={submitHaiku}>Submit {poemNameLower}</button>
+          <div class="badge badge-success">{celebrationMessages[celebrationIndex]} ✨</div>
         </div>
       {/if}
     </div>
   </div>
 
   <!-- Simplified Unified Input -->
-  <div class="mx-auto max-w-3xl">
+  <div class="mx-auto max-w-3xl relative">
     <UnifiedHaikuInput
       bind:this={unifiedInputComponent}
       bind:title
@@ -185,9 +167,9 @@
 
     <!-- Features row -->
     <div class="mt-6 flex items-center justify-center gap-2 text-xs flex-wrap">
-      <div class="badge badge-outline">Auto line breaks</div>
-      <div class="badge badge-outline">Real-time validation</div>
-      <div class="badge badge-outline">Works offline</div>
+      <div class="badge badge-outline">Auto line breaks ⛓️</div>
+      <div class="badge badge-outline">Real-time validation 🔄</div>
+      <div class="badge badge-outline">Works offline 📴</div>
     </div>
   </div>
 </div>
@@ -201,33 +183,14 @@
 />
 
 <style>
-  .animate-fade-in { animation: fadeIn 0.6s ease-out; }
-
-  .syllable-indicator {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    border-radius: 9999px;
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   
-  .syllable-perfect {
-    color: #15803d;
-    background: color-mix(in srgb, #10b981 15%, transparent);
-    border: 1px solid color-mix(in srgb, #10b981 30%, transparent);
+  .animate-fade-in {
+    animation: fade-in 0.8s ease-out;
   }
   
-  .syllable-over {
-    color: #dc2626;
-    background: color-mix(in srgb, #ef4444 15%, transparent);
-    border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
-  }
-  
-  .syllable-under {
-    color: #1d4ed8;
-    background: color-mix(in srgb, #3b82f6 12%, transparent);
-    border: 1px solid color-mix(in srgb, #3b82f6 25%, transparent);
-  }
-
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  /* removed decorative leaves */
 </style>

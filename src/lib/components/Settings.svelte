@@ -12,18 +12,10 @@
     enableShake: true,
     enableConfetti: true,
     poemType: 'haiku',
-    indicatorMode: 'count',
     showProgressBar: false,
-    hideHeader: false,
-    enableEphemeralHints: true,
     preset: 'default'
   };
-  // Optional fields applied by presets
-  /** @type {boolean} */ let enableGentleErrorPulse = true;
-  /** @type {boolean} */ let lineGuideOnFocus = true;
-  /** @type {boolean} */ let softSuccessPulse = true;
-  // Mirror optional fields onto the root settings object so consumers can read them
-  $: settings = { ...settings, enableGentleErrorPulse, lineGuideOnFocus, softSuccessPulse };
+  // Removed optional focus-only fields (no longer configurable)
 
   import { presets } from '$lib/stores/settings.js';
 
@@ -215,100 +207,10 @@
             </span>
           </label>
         </div>
-        <div class="setting-item">
-          <label class="toggle-label">
-            <input 
-              type="checkbox" 
-              bind:checked={settings.hideHeader}
-              class="toggle-input"
-              on:change={() => settings.preset = 'custom'}
-            />
-            <span class="toggle-slider"></span>
-            <span class="toggle-text">
-              <span class="toggle-title">Hide editor header</span>
-              <div class="setting-description">Hides the title and line counters area for a cleaner canvas.</div>
-            </span>
-          </label>
-        </div>
-        <div class="setting-item">
-          <label class="toggle-label">
-            <input 
-              type="checkbox" 
-              bind:checked={settings.enableEphemeralHints}
-              class="toggle-input"
-              on:change={() => settings.preset = 'custom'}
-            />
-            <span class="toggle-slider"></span>
-            <span class="toggle-text">
-              <span class="toggle-title">Enable ephemeral hints</span>
-              <div class="setting-description">Show brief, gentle feedback while writing.</div>
-            </span>
-          </label>
-        </div>
         
         
 
-  <div class="setting-item">
-    <label class="toggle-label">
-      <input 
-        type="checkbox" 
-        bind:checked={enableGentleErrorPulse}
-        class="toggle-input"
-        on:change={() => settings.preset = 'custom'}
-      />
-      <span class="toggle-slider"></span>
-      <span class="toggle-text">
-        <span class="toggle-title">Gentle error pulse</span>
-        <div class="setting-description">Subtle border pulse instead of shake in focus mode</div>
-      </span>
-    </label>
-  </div>
-
-  <div class="setting-item">
-    <label class="toggle-label">
-      <input 
-        type="checkbox" 
-        bind:checked={lineGuideOnFocus}
-        class="toggle-input"
-        on:change={() => settings.preset = 'custom'}
-      />
-      <span class="toggle-slider"></span>
-      <span class="toggle-text">
-        <span class="toggle-title">Line guide on focus</span>
-        <div class="setting-description">Show a minimal line count hint only when the editor is focused</div>
-      </span>
-    </label>
-  </div>
-
-  <div class="setting-item">
-    <label class="toggle-label">
-      <input 
-        type="checkbox" 
-        bind:checked={softSuccessPulse}
-        class="toggle-input"
-        on:change={() => settings.preset = 'custom'}
-      />
-      <span class="toggle-slider"></span>
-      <span class="toggle-text">
-        <span class="toggle-title">Soft success pulse</span>
-        <div class="setting-description">A gentle glow when the poem completes in focus mode</div>
-      </span>
-    </label>
-          <!-- Indicator mode dropdown replaced by expandable options -->
-          <div class="setting-item">
-            <h3 class="setting-label">Syllable indicator</h3>
-            <div class="poem-type-grid">
-              <button class="poem-type-option {settings.indicatorMode === 'count' ? 'selected' : ''}" on:click={() => { settings.indicatorMode = 'count'; settings.preset = 'custom'; }}>
-                <div class="poem-type-name">Count</div>
-                <div class="poem-type-description">Show per-line counters like 5/7/5.</div>
-              </button>
-              <button class="poem-type-option {settings.indicatorMode === 'minimal' ? 'selected' : ''}" on:click={() => { settings.indicatorMode = 'minimal'; settings.preset = 'custom'; }}>
-                <div class="poem-type-name">Minimal</div>
-                <div class="poem-type-description">Simpler status (ok/over/...). Cleaner look.</div>
-              </button>
-            </div>
-          </div>
-  </div>
+  <!-- Removed non-functional toggles: gentle error pulse, line guide on focus, soft success pulse, hide header, indicator mode, ephemeral hints -->
       </div>
     </div>
   </div>

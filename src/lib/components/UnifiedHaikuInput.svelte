@@ -333,23 +333,33 @@
       return;
     }
     
-    // Handle ENTER at syllable limits
-    if (event.key === 'Enter' && currentSyll === expectedSyll && !isAtWordBoundary) {
-      event.preventDefault();
+    // Handle ENTER - strict line limit enforcement
+    if (event.key === 'Enter') {
+      // Count existing newlines
+      const newlineCount = (content.match(/\n/g) || []).length;
       
-      if (currentLineIndex < maxLines - 1) {
-        // Insert newline and move to next line
-        const beforeCursor = content.substring(0, cursorPos);
-        const afterCursor = content.substring(cursorPos);
-        content = beforeCursor + '\n' + afterCursor;
-        
-        setTimeout(() => {
-          textareaElement.setSelectionRange(cursorPos + 1, cursorPos + 1);
-        }, 0);
-      } else {
-        // At last line limit - shake to indicate no more lines
+      // Block if we're at or would exceed the line limit
+      if (newlineCount >= maxLines - 1) {
+        event.preventDefault();
         if (settings.enableShake) {
           shakeWindow();
+        }
+        return;
+      }
+      
+      // Allow newline if under limit and at syllable boundary
+      if (currentSyll === expectedSyll && !isAtWordBoundary) {
+        event.preventDefault();
+        
+        if (currentLineIndex < maxLines - 1) {
+          // Insert newline and move to next line
+          const beforeCursor = content.substring(0, cursorPos);
+          const afterCursor = content.substring(cursorPos);
+          content = beforeCursor + '\n' + afterCursor;
+          
+          setTimeout(() => {
+            textareaElement.setSelectionRange(cursorPos + 1, cursorPos + 1);
+          }, 0);
         }
       }
       return;
@@ -417,7 +427,8 @@
       <input
         bind:value={title}
         on:keydown={handleKeydown}
-        placeholder={`Enter your ${currentPoemType.name.toLowerCase()} title...`}
+        placeholder={`Give your ${currentPoemType.name.toLowerCase()} a title...`}
+        maxlength="40"
         class="title-input"
         autocomplete="off"
         aria-label={`${currentPoemType.name} title`}
@@ -535,6 +546,8 @@
     font-size: 18px;
     line-height: 1.8;
     min-height: calc(var(--expected-lines) * 32px);
+    max-height: calc(var(--expected-lines) * 32px);
+    overflow: hidden; /* No scrollbars */
   }
   
   .content-textarea::placeholder {

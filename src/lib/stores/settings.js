@@ -4,14 +4,8 @@ export const defaultSettings = {
   autoBackspace: false,
   enableShake: true,
   enableConfetti: true,
-  enableGentleErrorPulse: true,
-  lineGuideOnFocus: true,
-  softSuccessPulse: true,
   poemType: 'haiku',
-  indicatorMode: 'count', // 'count' | 'minimal'
   showProgressBar: false,
-  hideHeader: false,
-  enableEphemeralHints: true,
   preset: 'default' // 'default' | 'focus' | 'custom'
 };
 
@@ -20,13 +14,8 @@ export const focusPreset = {
   autoBackspace: true,
   enableShake: false,
   enableConfetti: false,
-  enableGentleErrorPulse: true,
-  lineGuideOnFocus: true,
-  softSuccessPulse: true,
-  indicatorMode: 'minimal',
   showProgressBar: true,
-  hideHeader: true,
-  enableEphemeralHints: true
+  // focus preset no longer hides editor chrome; progress bar remains
 };
 
 export const presets = {
@@ -40,8 +29,14 @@ function safeGetStoredSettings() {
       const raw = window.localStorage.getItem('app-settings');
       if (raw) {
         const parsed = JSON.parse(raw);
-        // Merge with defaults to avoid missing keys after upgrades
-        return { ...defaultSettings, ...parsed };
+        // Only keep known keys to avoid carrying removed settings forward
+        const filtered = Object.fromEntries(
+          Object.keys(defaultSettings).map((key) => [
+            key,
+            Object.prototype.hasOwnProperty.call(parsed, key) ? parsed[key] : defaultSettings[/** @type {keyof typeof defaultSettings} */(key)]
+          ])
+        );
+        return /** @type {typeof defaultSettings} */ (filtered);
       }
     }
   } catch (err) {

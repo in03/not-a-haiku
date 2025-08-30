@@ -38,6 +38,7 @@
   let isPlaying = false;
   let highlightedWordIndex = -1;
   let currentWords = []; // Store parsed words for highlighting
+  let highlightCanvas; // Reference to canvas element
   /** @type {HTMLAudioElement | null} */
   let currentAudio = null;
   /** @type {string[]} */
@@ -137,6 +138,12 @@
       // Set playing state
       isPlaying = true;
       console.log('🎬 Set isPlaying to true, currentWords length:', currentWords.length);
+
+      // Wait for canvas to render, then setup highlighting
+      await tick();
+      if (highlightCanvas && textareaElement) {
+        setupCanvasHighlighting();
+      }
 
       // Try the SIMPLE approach first (non-streaming, from working example)
       await simpleTextToSpeechWithTiming(
@@ -253,6 +260,129 @@
       ...item,
       isHighlighted: item.index === highlightedWordIndex
     }));
+    
+    // Draw highlights on canvas
+    if (highlightCanvas) {
+      drawCanvasHighlights();
+    }
+  }
+
+  /**
+   * Setup canvas-based highlighting with pixel-perfect measurements
+   */
+  function setupCanvasHighlighting() {
+    if (!highlightCanvas || !textareaElement) return;
+    
+    // Get textarea dimensions and styles
+    const rect = textareaElement.getBoundingClientRect();
+    const styles = window.getComputedStyle(textareaElement);
+    
+    // Setup canvas to match textarea exactly
+    highlightCanvas.width = rect.width;
+    highlightCanvas.height = rect.height;
+    highlightCanvas.style.width = rect.width + 'px';
+    highlightCanvas.style.height = rect.height + 'px';
+    
+    const ctx = highlightCanvas.getContext('2d');
+    
+    // Copy font properties to canvas context
+    ctx.font = `${styles.fontStyle} ${styles.fontVariant} ${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`;
+    ctx.textBaseline = 'top';
+    
+    // Calculate word positions using canvas measurements
+    calculateWordPositions(ctx, styles);
+    
+    console.log('🎨 Setup canvas highlighting with dimensions:', {
+      width: rect.width,
+      height: rect.height,
+      font: ctx.font
+    });
+  }
+
+  /**
+   * Calculate exact pixel positions for each word using canvas measurements
+   */
+  function calculateWordPositions(ctx, styles) {
+    const padding = {
+      left: parseFloat(styles.paddingLeft),
+      top: parseFloat(styles.paddingTop)
+    };
+    const lineHeight = parseFloat(styles.lineHeight);
+    
+    let x = padding.left;
+    let y = padding.top;
+    let lineIndex = 0;
+    
+    // Add position data to each word
+    currentWords = currentWords.map(wordItem => {
+      if (wordItem.isSpace) {
+        const spaceWidth = ctx.measureText(' ').width;
+        x += spaceWidth;
+        return { ...wordItem, x, y, width: spaceWidth, height: lineHeight };
+      } else if (wordItem.word === '\n') {
+        // New line
+        x = padding.left;
+        y += lineHeight;
+        lineIndex++;
+        return { ...wordItem, x, y, width: 0, height: lineHeight };
+      } else {
+        // Regular word or punctuation
+        const metrics = ctx.measureText(wordItem.word);
+        const wordWidth = metrics.width;
+        const wordX = x;
+        
+        x += wordWidth;
+        
+        return { 
+          ...wordItem, 
+          x: wordX, 
+          y, 
+          width: wordWidth, 
+          height: lineHeight,
+          lineIndex 
+        };
+      }
+    });
+    
+    console.log('📏 Calculated word positions:', currentWords.slice(0, 5));
+  }
+
+  /**
+   * Draw highlights on canvas using calculated positions
+   */
+  function drawCanvasHighlights() {
+    if (!highlightCanvas) return;
+    
+    const ctx = highlightCanvas.getContext('2d');
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+    
+    // Draw highlights for highlighted words
+    currentWords.forEach(wordItem => {
+      if (wordItem.isHighlighted && wordItem.x !== undefined) {
+        // Draw yellow highlight rectangle
+        ctx.fillStyle = 'rgba(255, 235, 59, 0.4)';
+        ctx.fillRect(
+          wordItem.x - 1, 
+          wordItem.y, 
+          wordItem.width + 2, 
+          wordItem.height
+        );
+        
+        // Add subtle border for debug
+        ctx.strokeStyle = 'rgba(255, 235, 59, 0.8)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(
+          wordItem.x - 1, 
+          wordItem.y, 
+          wordItem.width + 2, 
+          wordItem.height
+        );
+        
+        console.log(`🎨 Drew highlight for "${wordItem.word}" at (${wordItem.x}, ${wordItem.y}) size ${wordItem.width}x${wordItem.height}`);
+      }
+    });
   }
 
 
@@ -688,24 +818,13 @@
           Playing: {isPlaying} | Words: {currentWords.length} | HighlightIdx: {highlightedWordIndex}
         </div>
 
-        <!-- Text highlighting overlay - show during TTS playback -->
+        <!-- Canvas-based highlighting overlay -->
         {#if currentWords.length > 0}
-          <div class="highlight-text-overlay" style="background: rgba(255,0,0,0.1);">
-            {#each currentWords as wordItem}
-              {#if wordItem.isSpace}
-                <span class="space"> </span>
-              {:else if wordItem.isNonWord}
-                <span class="punctuation">{wordItem.word}</span>
-              {:else}
-                <span 
-                  class="word {wordItem.isHighlighted ? 'highlighted' : ''}"
-                  style="border: 1px solid blue;"
-                >
-                  {wordItem.word}
-                </span>
-              {/if}
-            {/each}
-          </div>
+          <canvas 
+            bind:this={highlightCanvas}
+            class="highlight-canvas"
+            style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 5;"
+          ></canvas>
         {:else if highlightedWordIndex >= 0}
           <div class="simple-highlight">
             Word {highlightedWordIndex} is being spoken
@@ -1020,18 +1139,37 @@
     right: 0;
     bottom: 0;
     padding: var(--content-padding-block) var(--content-padding-inline);
+    
+    /* Match textarea font properties EXACTLY */
     font-family: var(--font-mono);
     font-size: var(--content-font-size);
+    font-weight: inherit;
+    font-style: inherit;
+    font-variant: inherit;
     line-height: var(--content-line-height);
+    letter-spacing: inherit;
+    word-spacing: inherit;
+    text-rendering: inherit;
+    
+    /* Match textarea text behavior */
     white-space: pre-wrap;
     word-wrap: break-word;
+    word-break: inherit;
+    text-align: inherit;
+    
+    /* Overlay properties */
     pointer-events: none;
     z-index: 5;
-    color: transparent; /* Hide the text, only show highlights */
+    color: transparent;
     background: transparent;
-    border: 1px solid transparent; /* Match textarea border */
+    border: 1px solid transparent;
     box-sizing: border-box;
-    overflow: hidden; /* Prevent text overflow */
+    overflow: hidden;
+    
+    /* Force same rendering as textarea */
+    -webkit-font-smoothing: inherit;
+    -moz-osx-font-smoothing: inherit;
+    text-size-adjust: inherit;
   }
 
   .highlight-text-overlay .word {

@@ -37,12 +37,16 @@
   // TTS state
   let isPlaying = false;
   let highlightedWordIndex = -1;
+  /** @type {Array<{word: string, index: number, isHighlighted: boolean, isNonWord?: boolean, isSpace?: boolean, x?: number, y?: number, width?: number, height?: number, lineIndex?: number}>} */
   let currentWords = []; // Store parsed words for highlighting
+  /** @type {HTMLCanvasElement | null} */
   let highlightCanvas; // Reference to canvas element
   /** @type {HTMLAudioElement | null} */
   let currentAudio = null;
   /** @type {string[]} */
   let words = [];
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let clearHighlightTimeoutId = null;
   
   // Simple highlighting - just use reactive variables
   // No complex DOM manipulation needed!
@@ -119,25 +123,22 @@
 
   // Start text-to-speech
   async function startTTS() {
-    console.log('🎵 startTTS function called!');
+    console.log('TTS start');
     if (!content.trim() || !isValidApiKey(settings.elevenlabsApiKey)) return;
     
     try {
+      cancelScheduledClearHighlighting();
       isPlaying = true;
       highlightedWordIndex = -1;
       
       const textToSpeak = content;
-      console.log('🎤 Starting TTS for text:', JSON.stringify(textToSpeak));
-      console.log('🎤 Text length:', textToSpeak.length, 'characters');
       
       // Prefer low-latency streaming playback with timing
       // Parse text into words for highlighting
       currentWords = parseTextIntoWords(textToSpeak);
-      console.log('📝 Parsed words for highlighting:', currentWords);
 
       // Set playing state
       isPlaying = true;
-      console.log('🎬 Set isPlaying to true, currentWords length:', currentWords.length);
 
       // Wait for canvas to render, then setup highlighting
       await tick();
@@ -149,20 +150,18 @@
       await simpleTextToSpeechWithTiming(
         textToSpeak,
         settings.elevenlabsApiKey,
-        (wordIndex, lineIndex) => {
-          console.log(`🎯 SIMPLE TTS callback received: wordIndex=${wordIndex}, lineIndex=${lineIndex}`);
+        (/** @type {number} */ wordIndex, /** @type {number} */ lineIndex) => {
           highlightedWordIndex = wordIndex;
         }
       );
 
       // Audio finished playing (handled internally by streaming function)
       isPlaying = false;
-      highlightedWordIndex = -1;
+      console.log('TTS completed');
       
     } catch (err) {
       console.error('TTS Error:', err);
       isPlaying = false;
-      highlightedWordIndex = -1;
       
       // Show specific error message
       let errorMessage = 'Text-to-speech failed. ';
@@ -192,14 +191,38 @@
     // For Web Audio API implementation, we can't directly stop playback
     // The streaming function handles cleanup internally
     // Just reset UI state
+    console.log('TTS stop');
     isPlaying = false;
-    highlightedWordIndex = -1;
     currentAudio = null;
-    currentWords = [];
+  }
+  
+  function scheduleClearHighlighting(delay = 3000) {
+    cancelScheduledClearHighlighting();
+    clearHighlightTimeoutId = setTimeout(() => {
+      highlightedWordIndex = -1;
+      if (highlightCanvas) {
+        const ctx = highlightCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+        }
+      }
+      clearHighlightTimeoutId = null;
+    }, delay);
+  }
+  
+  function cancelScheduledClearHighlighting() {
+    if (clearHighlightTimeoutId) {
+      clearTimeout(clearHighlightTimeoutId);
+      clearHighlightTimeoutId = null;
+    }
   }
 
   /**
    * Parse text into words for highlighting (similar to ElevenLabs approach)
+   */
+  /**
+   * @param {string} text
+   * @returns {Array<{word: string, index: number, isHighlighted: boolean, isNonWord?: boolean, isSpace?: boolean}>}
    */
   function parseTextIntoWords(text) {
     const words = [];
@@ -265,6 +288,9 @@
     if (highlightCanvas) {
       drawCanvasHighlights();
     }
+
+    // Reset a 1s clear timer on each index update; if updates stop, clear
+    scheduleClearHighlighting(1000);
   }
 
   /**
@@ -284,6 +310,7 @@
     highlightCanvas.style.height = rect.height + 'px';
     
     const ctx = highlightCanvas.getContext('2d');
+    if (!ctx) return;
     
     // Copy font properties to canvas context
     ctx.font = `${styles.fontStyle} ${styles.fontVariant} ${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`;
@@ -292,15 +319,15 @@
     // Calculate word positions using canvas measurements
     calculateWordPositions(ctx, styles);
     
-    console.log('🎨 Setup canvas highlighting with dimensions:', {
-      width: rect.width,
-      height: rect.height,
-      font: ctx.font
-    });
+    // Canvas highlighting initialized
   }
 
   /**
    * Calculate exact pixel positions for each word using canvas measurements
+   */
+  /**
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {CSSStyleDeclaration} styles
    */
   function calculateWordPositions(ctx, styles) {
     const padding = {
@@ -344,7 +371,7 @@
       }
     });
     
-    console.log('📏 Calculated word positions:', currentWords.slice(0, 5));
+    // Word positions calculated
   }
 
   /**
@@ -354,33 +381,51 @@
     if (!highlightCanvas) return;
     
     const ctx = highlightCanvas.getContext('2d');
+    if (!ctx) return;
     
     // Clear canvas
     ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
     
     // Draw highlights for highlighted words
     currentWords.forEach(wordItem => {
-      if (wordItem.isHighlighted && wordItem.x !== undefined) {
-        // Draw yellow highlight rectangle
-        ctx.fillStyle = 'rgba(255, 235, 59, 0.4)';
-        ctx.fillRect(
-          wordItem.x - 1, 
-          wordItem.y, 
-          wordItem.width + 2, 
-          wordItem.height
-        );
+      if (
+        wordItem.isHighlighted &&
+        wordItem.x !== undefined &&
+        wordItem.y !== undefined &&
+        wordItem.width !== undefined &&
+        wordItem.height !== undefined
+      ) {
+        const padding = 3;
+        const borderRadius = 4;
+        const x = wordItem.x - padding;
+        const y = wordItem.y + 1;
+        const width = wordItem.width + (padding * 2);
+        const height = wordItem.height - 2;
         
-        // Add subtle border for debug
-        ctx.strokeStyle = 'rgba(255, 235, 59, 0.8)';
+        // Create rounded rectangle path
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, borderRadius);
+        
+        // Fill with green gradient
+        const gradient = ctx.createLinearGradient(x, y, x, y + height);
+        gradient.addColorStop(0, 'rgba(34, 197, 94, 0.25)'); // green-500 with transparency
+        gradient.addColorStop(1, 'rgba(34, 197, 94, 0.35)');
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        // Add subtle green border
+        ctx.strokeStyle = 'rgba(34, 197, 94, 0.4)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(
-          wordItem.x - 1, 
-          wordItem.y, 
-          wordItem.width + 2, 
-          wordItem.height
-        );
+        ctx.stroke();
         
-        console.log(`🎨 Drew highlight for "${wordItem.word}" at (${wordItem.x}, ${wordItem.y}) size ${wordItem.width}x${wordItem.height}`);
+        // Add inner glow effect
+        ctx.beginPath();
+        ctx.roundRect(x + 0.5, y + 0.5, width - 1, height - 1, borderRadius - 0.5);
+        ctx.strokeStyle = 'rgba(34, 197, 94, 0.2)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        
+        // Drew green highlight
       }
     });
   }
@@ -390,7 +435,6 @@
   // Simple highlighting - just update reactive variable
   /** @param {number} wordIndex @param {string} text */
   function updateHighlighting(wordIndex, text) {
-    console.log(`🎨 Simple highlighting: wordIndex=${wordIndex}`);
     // Highlighting is now handled by Svelte reactivity
   }
   
@@ -755,7 +799,10 @@
   
   // Cleanup
   import { onDestroy } from 'svelte';
-  onDestroy(() => unsubscribeSettings());
+  onDestroy(() => {
+    unsubscribeSettings();
+    cancelScheduledClearHighlighting();
+  });
 </script>
 
 <div 
@@ -813,10 +860,7 @@
       {/if}
     {:else}
       <div class="textarea-container">
-        <!-- Debug: Show overlay state -->
-        <div class="debug-info" style="position: absolute; top: -30px; left: 0; font-size: 12px; background: rgba(0,0,0,0.8); color: white; padding: 4px; z-index: 20;">
-          Playing: {isPlaying} | Words: {currentWords.length} | HighlightIdx: {highlightedWordIndex}
-        </div>
+        <!-- Debug info removed - highlighting working perfectly! -->
 
         <!-- Canvas-based highlighting overlay -->
         {#if currentWords.length > 0}

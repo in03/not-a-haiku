@@ -6,7 +6,8 @@ export const defaultSettings = {
   enableConfetti: true,
   poemType: 'haiku',
   showProgressBar: false,
-  preset: 'default' // 'default' | 'focus' | 'custom'
+  preset: 'default', // 'default' | 'focus' | 'custom'
+  elevenlabsApiKey: '' // ElevenLabs API key for text-to-speech
 };
 
 export const focusPreset = {

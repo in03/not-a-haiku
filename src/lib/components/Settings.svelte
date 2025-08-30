@@ -13,7 +13,8 @@
     enableConfetti: true,
     poemType: 'haiku',
     showProgressBar: false,
-    preset: 'default'
+    preset: 'default',
+    elevenlabsApiKey: ''
   };
   // Removed optional focus-only fields (no longer configurable)
 
@@ -27,6 +28,7 @@
   }
   
   let poemTypeExpanded = false;
+  let showApiKey = false;
   
   function handleClose() {
     isOpen = false;
@@ -209,10 +211,52 @@
           </label>
         </div>
         
+      </div>
+      
+      <!-- Text-to-Speech Settings -->
+      <div class="setting-group">
+        <h3 class="setting-label">Text-to-Speech</h3>
         
+        <div class="setting-item">
+          <label class="api-key-label">
+            <span class="api-key-title">ElevenLabs API Key</span>
+            <div class="setting-description">Required for text-to-speech functionality. Your key is stored locally and never sent to our servers.</div>
+            <div class="api-key-input-container">
+              <input 
+                type={showApiKey ? 'text' : 'password'}
+                class="api-key-input"
+                bind:value={settings.elevenlabsApiKey}
+                on:input={() => settings.preset = 'custom'}
+                placeholder="sk-..."
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button 
+                type="button"
+                class="api-key-toggle"
+                on:click={() => showApiKey = !showApiKey}
+                aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+              >
+                {#if showApiKey}
+                  <!-- Eye slash icon -->
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                  </svg>
+                {:else}
+                  <!-- Eye icon -->
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                {/if}
+              </button>
+            </div>
+          </label>
+        </div>
+      </div>
 
   <!-- Removed non-functional toggles: gentle error pulse, line guide on focus, soft success pulse, hide header, indicator mode, ephemeral hints -->
-      </div>
     </div>
   </div>
 {/if}
@@ -591,6 +635,70 @@
   
   .save-button:hover {
     filter: brightness(0.95);
+  }
+  
+  /* API Key Input Styles */
+  .api-key-label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .api-key-title {
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+  
+  .api-key-input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-top: 8px;
+  }
+  
+  .api-key-input {
+    width: 100%;
+    padding: 12px 48px 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    font-family: 'Courier New', monospace;
+    transition: all 0.2s;
+  }
+  
+  .api-key-input:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-focus) 20%, transparent);
+  }
+  
+  .api-key-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+  }
+  
+  .api-key-toggle {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .api-key-toggle:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
   }
   
   /* Inline panel styles */

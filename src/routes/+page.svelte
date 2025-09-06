@@ -34,6 +34,19 @@
   let showAnalysis = false;
   let isAnalyzing = false;
   
+  // Function to start a new haiku
+  function startNewHaiku() {
+    if (unifiedInputComponent) {
+      unifiedInputComponent.reset();
+    }
+    title = '';
+    content = '';
+    syllableCounts = [];
+    validation = { isValid: false, isComplete: false, feedback: '' };
+    analysis = null;
+    showAnalysis = false;
+  }
+  
   const celebrationMessages = [
     "Well done",
     "You're a natural", 
@@ -127,20 +140,19 @@
         }
       }
       
-      // Reset after delay (longer if analysis is shown)
-      const resetDelay = showAnalysis ? 8000 : 3000;
-      setTimeout(() => {
-        if (unifiedInputComponent) {
-          unifiedInputComponent.reset();
-        }
-        title = '';
-        content = '';
-        syllableCounts = [];
-        validation = { isValid: false, isComplete: false, feedback: '' };
-        analysis = null;
-        showAnalysis = false;
-        celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
-      }, resetDelay);
+      // Don't auto-reset if analysis is shown - let user manually start new haiku
+      if (!showAnalysis) {
+        setTimeout(() => {
+          if (unifiedInputComponent) {
+            unifiedInputComponent.reset();
+          }
+          title = '';
+          content = '';
+          syllableCounts = [];
+          validation = { isValid: false, isComplete: false, feedback: '' };
+          celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
+        }, 3000);
+      }
     }
   }
   
@@ -257,31 +269,42 @@
 
   <!-- Simplified Unified Input -->
   <div class="mx-auto max-w-3xl relative">
-    <UnifiedHaikuInput
-      bind:this={unifiedInputComponent}
-      bind:title
-      bind:content
-      on:validation={handleValidation}
-      on:syllables={handleSyllables}
-      on:toast={handleToast}
-      on:haikuSubmit={handleSubmit}
-      on:cursorMove={handleCursorMove}
-    />
-
-    <!-- Features row -->
-    <div class="mt-6 flex items-center justify-center gap-2 text-xs flex-wrap">
-      <div class="badge badge-outline">Auto line breaks ⛓️</div>
-      <div class="badge badge-outline">Real-time validation 🔄</div>
-      <div class="badge badge-outline">Works offline 📴</div>
-    </div>
-    
-    <!-- Analysis Results -->
     {#if showAnalysis && analysis}
-      <div class="mt-8" transition:fly={{ y: 20, duration: 500, easing: cubicOut }}>
+      <!-- Analysis Results - replaces haiku input -->
+      <div transition:fly={{ y: 20, duration: 500, easing: cubicOut }}>
         <AnalysisResults 
           {analysis}
           isVisible={showAnalysis}
         />
+        
+        <!-- Start New Haiku Button -->
+        <div class="mt-6 flex justify-center">
+          <button 
+            class="btn btn-primary btn-lg"
+            on:click={startNewHaiku}
+          >
+            ✨ Write Another {poemName}
+          </button>
+        </div>
+      </div>
+    {:else}
+      <!-- Title input, haiku editor with integrated submission -->
+      <UnifiedHaikuInput
+        bind:this={unifiedInputComponent}
+        bind:title
+        bind:content
+        on:validation={handleValidation}
+        on:syllables={handleSyllables}
+        on:toast={handleToast}
+        on:haikuSubmit={handleSubmit}
+        on:cursorMove={handleCursorMove}
+      />
+
+      <!-- Features row -->
+      <div class="mt-6 flex items-center justify-center gap-2 text-xs flex-wrap">
+        <div class="badge badge-outline">Auto line breaks ⛓️</div>
+        <div class="badge badge-outline">Real-time validation 🔄</div>
+        <div class="badge badge-outline">Works offline 📴</div>
       </div>
     {/if}
   </div>

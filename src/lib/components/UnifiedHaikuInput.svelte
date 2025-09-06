@@ -152,6 +152,9 @@
         settings.elevenlabsApiKey,
         (/** @type {number} */ wordIndex, /** @type {number} */ lineIndex) => {
           highlightedWordIndex = wordIndex;
+        },
+        {
+          pauseDuration: settings.ttsPauseDuration || 1.0
         }
       );
 

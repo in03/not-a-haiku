@@ -28,9 +28,18 @@
     window.location.href = '/api/auth/github';
   }
   
+  // Modal state
+  let showSignOutModal = false;
+  
   // Handle GitHub sign out
   function handleGitHubSignOut() {
     authStore.signOut();
+    showSignOutModal = false;
+  }
+  
+  // Show sign out confirmation
+  function showSignOutConfirmation() {
+    showSignOutModal = true;
   }
 </script>
 
@@ -45,39 +54,14 @@
         <nav class="hidden sm:flex items-center gap-2">
           <!-- GitHub Authentication -->
           {#if $authStore.isAuthenticated && $authStore.user}
-            <!-- User Avatar Dropdown -->
-            <div class="dropdown dropdown-end">
-              <div tabindex="0" role="button" class="btn btn-sm btn-ghost btn-circle avatar" title="Signed in as {$authStore.user.name || $authStore.user.login}">
-                <div class="w-8 rounded-full ring-2 ring-green-500 ring-offset-2 ring-offset-base-100">
-                  <img 
-                    src={$authStore.user.avatar_url} 
-                    alt={$authStore.user.name || $authStore.user.login}
-                    class="rounded-full"
-                  />
-                </div>
-              </div>
-              <ul class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300">
-                <li class="menu-title">
-                  <span class="text-xs text-base-content/70">Signed in as</span>
-                </li>
-                <li>
-                  <div class="flex items-center gap-3 cursor-default">
-                    <div class="avatar">
-                      <div class="w-8 rounded-full">
-                        <img src={$authStore.user.avatar_url} alt="Avatar" />
-                      </div>
-                    </div>
-                    <div class="flex flex-col">
-                      <span class="font-medium text-sm">{$authStore.user.name || $authStore.user.login}</span>
-                      <span class="text-xs text-base-content/70">@{$authStore.user.login}</span>
-                    </div>
-                  </div>
-                </li>
-                <div class="divider my-1"></div>
-                <li><a href="{base}/settings"><SettingsIcon class="w-4 h-4" />Settings</a></li>
-                <li><button on:click={handleGitHubSignOut} class="text-error"><X class="w-4 h-4" />Sign Out</button></li>
-              </ul>
-            </div>
+            <!-- Sign Out Button -->
+            <button 
+              class="btn btn-sm btn-outline btn-error"
+              on:click={showSignOutConfirmation}
+            >
+              <Github class="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
           {:else}
             <!-- Sign In Button -->
             <button 
@@ -138,19 +122,11 @@
     <nav class="flex flex-col gap-2">
       <!-- GitHub Authentication (Mobile) -->
       {#if $authStore.isAuthenticated && $authStore.user}
-        <div class="flex items-center gap-3 p-3 bg-base-200 rounded-lg mb-2">
-          <div class="avatar">
-            <div class="w-10 rounded-full ring-2 ring-green-500">
-              <img src={$authStore.user.avatar_url} alt={$authStore.user.name || $authStore.user.login} />
-            </div>
-          </div>
-          <div class="flex flex-col">
-            <span class="font-medium text-sm">{$authStore.user.name || $authStore.user.login}</span>
-            <span class="text-xs text-base-content/70">@{$authStore.user.login}</span>
-          </div>
-        </div>
-        <button class="btn btn-ghost btn-sm text-error" on:click={() => { handleGitHubSignOut(); closeMenu(); }}>
-          <X class="w-4 h-4" />
+        <button 
+          class="btn btn-outline btn-error"
+          on:click={() => { showSignOutConfirmation(); closeMenu(); }}
+        >
+          <Github class="w-4 h-4" />
           <span class="ml-2">Sign Out</span>
         </button>
         <div class="divider my-1"></div>
@@ -184,6 +160,68 @@
         <span class="ml-2">Docs</span>
       </a>
     </nav>
+  </div>
+{/if}
+
+<!-- Sign Out Confirmation Modal -->
+{#if showSignOutModal && $authStore.user}
+  <!-- Modal overlay - responsive approach -->
+  <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <!-- Modal content - responsive sizing -->
+    <div class="bg-base-100 rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden">
+      <!-- Modal header -->
+      <div class="flex items-center justify-between p-6 border-b border-base-300">
+        <h3 class="text-lg font-semibold">Sign Out</h3>
+        <button 
+          class="btn btn-sm btn-ghost btn-circle"
+          on:click={() => showSignOutModal = false}
+          aria-label="Close"
+        >
+          <X class="w-4 h-4" />
+        </button>
+      </div>
+      
+      <!-- Modal body -->
+      <div class="p-6 text-center">
+        <!-- User avatar -->
+        <div class="flex justify-center mb-4">
+          <div class="avatar">
+            <div class="w-16 rounded-full ring-2 ring-base-300">
+              <img 
+                src={$authStore.user.avatar_url} 
+                alt={$authStore.user.name || $authStore.user.login}
+                class="rounded-full"
+              />
+            </div>
+          </div>
+        </div>
+        
+        <!-- Confirmation text -->
+        <h4 class="text-base font-medium mb-2">
+          Are you sure you want to sign out?
+        </h4>
+        <p class="text-sm text-base-content/70 mb-6">
+          You'll be signed out of <strong>{$authStore.user.name || $authStore.user.login}</strong>
+        </p>
+        
+        <!-- Action buttons -->
+        <div class="flex flex-col sm:flex-row gap-3 sm:gap-3 sm:justify-center">
+          <button 
+            class="btn btn-ghost order-2 sm:order-1"
+            on:click={() => showSignOutModal = false}
+          >
+            Cancel
+          </button>
+          <button 
+            class="btn btn-error order-1 sm:order-2"
+            on:click={handleGitHubSignOut}
+          >
+            <Github class="w-4 h-4" />
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 {/if}
 

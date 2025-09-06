@@ -15,7 +15,8 @@
     poemType: 'haiku',
     showProgressBar: false,
     preset: 'default',
-    elevenlabsApiKey: ''
+    elevenlabsApiKey: '',
+    ttsPauseDuration: 1.0
   };
   // Removed optional focus-only fields (no longer configurable)
 
@@ -133,7 +134,7 @@
         <h3 class="setting-label" id="poem-type-label">Poem Type</h3>
         
         <!-- Dropdown-style trigger -->
-          <button id="poem-type-trigger" aria-labelledby="poem-type-label" class="poem-type-trigger" type="button" on:click={togglePoemTypeSelector} aria-expanded={poemTypeExpanded} aria-controls="poem-type-grid">
+        <button id="poem-type-trigger" aria-labelledby="poem-type-label" class="poem-type-trigger" type="button" on:click={togglePoemTypeSelector} aria-expanded={poemTypeExpanded} aria-controls="poem-type-grid">
             <div class="poem-type-current">
               <div class="poem-type-name">{poemTypes[/** @type {keyof typeof poemTypes} */ (settings.poemType)].name}</div>
               <div class="poem-type-syllables">{poemTypes[/** @type {keyof typeof poemTypes} */ (settings.poemType)].syllables.join('-')} syllables</div>
@@ -223,49 +224,6 @@
           </label>
         </div>
         
-      </div>
-      
-      <!-- Text-to-Speech Settings -->
-      <div class="setting-group">
-        <h3 class="setting-label">Text-to-Speech</h3>
-        
-        <div class="setting-item">
-          <label class="api-key-label">
-            <span class="api-key-title">ElevenLabs API Key</span>
-            <div class="setting-description">Required for text-to-speech functionality. Your key is stored locally and never sent to our servers.</div>
-            <div class="api-key-input-container">
-              <input 
-                type={showApiKey ? 'text' : 'password'}
-                class="api-key-input"
-                bind:value={settings.elevenlabsApiKey}
-                on:input={() => settings.preset = 'custom'}
-                placeholder="sk-..."
-                autocomplete="off"
-                spellcheck="false"
-              />
-              <button 
-                type="button"
-                class="api-key-toggle"
-                on:click={() => showApiKey = !showApiKey}
-                aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
-              >
-                {#if showApiKey}
-                  <!-- Eye slash icon -->
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                  </svg>
-                {:else}
-                  <!-- Eye icon -->
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                {/if}
-              </button>
-            </div>
-          </label>
-        </div>
       </div>
       
       <!-- AI Analysis Settings -->
@@ -371,6 +329,75 @@
               </div>
             {/if}
           </div>
+        </div>
+      </div>
+      
+      <!-- Text-to-Speech Settings -->
+      <div class="setting-group">
+        <h3 class="setting-label">Text-to-Speech</h3>
+        
+        <div class="setting-item">
+          <label class="api-key-label">
+            <span class="api-key-title">ElevenLabs API Key</span>
+            <div class="setting-description">Required for text-to-speech functionality. Your key is stored locally and never sent to our servers.</div>
+            <div class="api-key-input-container">
+                <input 
+                  type={showApiKey ? 'text' : 'password'}
+                  class="api-key-input"
+                  bind:value={settings.elevenlabsApiKey}
+                  on:input={() => settings.preset = 'custom'}
+                  placeholder="sk-..."
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button 
+                  type="button"
+                  class="api-key-toggle"
+                  on:click={() => showApiKey = !showApiKey}
+                  aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                >
+                  {#if showApiKey}
+                    <!-- Eye slash icon -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </svg>
+                  {:else}
+                    <!-- Eye icon -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  {/if}
+                </button>
+              </div>
+          </label>
+        </div>
+        
+        <div class="setting-item">
+          <label class="range-label">
+            <span class="range-title">Pause Between Lines</span>
+            <div class="setting-description">Duration of pause between haiku lines during text-to-speech</div>
+            <div class="range-input-container">
+                <input 
+                  type="range"
+                  class="range-input"
+                  bind:value={settings.ttsPauseDuration}
+                  on:input={() => settings.preset = 'custom'}
+                  min="0.1"
+                  max="3.0"
+                  step="0.1"
+                />
+              <div class="range-value">
+                {settings.ttsPauseDuration}s
+              </div>
+            </div>
+            <div class="range-marks">
+                <span>0.1s</span>
+                <span>1.5s</span>
+                <span>3.0s</span>
+            </div>
+          </label>
         </div>
       </div>
 
@@ -817,6 +844,87 @@
   .api-key-toggle:hover {
     background: var(--bg-tertiary);
     color: var(--text-primary);
+  }
+  
+  /* Range input styles */
+  .range-label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .range-title {
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+  
+  .range-input-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  
+  .range-input {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    outline: none;
+    -webkit-appearance: none;
+    transition: all 0.2s;
+  }
+  
+  .range-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--border-focus);
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .range-input::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .range-input::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--border-focus);
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .range-input::-moz-range-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .range-value {
+    min-width: 40px;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--border-focus);
+    font-family: 'Courier New', monospace;
+  }
+  
+  .range-marks {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
   }
   
   /* Inline panel styles */

@@ -103,11 +103,11 @@
 </script>
 
 {#if analysis && isVisible}
-  <div class="bg-white rounded-xl shadow-lg p-8 text-center space-y-6 border border-gray-100">
+  <div class="bg-base-200 rounded-xl shadow-lg p-8 text-center space-y-6 border border-base-300">
     <!-- Header -->
     <div class="flex items-center justify-center gap-3 mb-6">
-      <Brain class="w-6 h-6 text-blue-600" />
-      <h2 class="text-2xl font-bold text-gray-800">AI Analysis</h2>
+      <Brain class="w-6 h-6 text-primary" />
+      <h2 class="text-2xl font-bold text-base-content">AI Analysis</h2>
       {#if sparklesVisible}
         <Sparkles class="w-6 h-6 text-yellow-500 animate-pulse" />
       {/if}
@@ -129,7 +129,7 @@
 
     <!-- Rating Text -->
     {#if starsAnimated[Math.min(4, analysis.rating - 1)]}
-      <div class="text-lg font-semibold text-gray-600 animate-fade-in">
+      <div class="text-lg font-semibold text-base-content/70 animate-fade-in">
         {analysis.rating} out of 5 stars
       </div>
     {/if}
@@ -137,8 +137,8 @@
     <!-- Comment -->
     {#if commentVisible}
       <div class="animate-slide-up">
-        <h3 class="text-xl font-bold text-gray-800 mb-3">Interpretation</h3>
-        <p class="text-lg text-gray-700 italic leading-relaxed max-w-md mx-auto">
+        <h3 class="text-xl font-bold text-base-content mb-3">Interpretation</h3>
+        <p class="text-lg text-base-content/80 italic leading-relaxed max-w-md mx-auto">
           "{analysis.comment}"
         </p>
       </div>
@@ -147,7 +147,7 @@
     <!-- Tags -->
     {#if tagsVisible && analysis.tags.length > 0}
       <div class="animate-slide-up" style="animation-delay: 200ms">
-        <h4 class="text-lg font-semibold text-gray-800 mb-4 flex items-center justify-center gap-2">
+        <h4 class="text-lg font-semibold text-base-content mb-4 flex items-center justify-center gap-2">
           <Tag class="w-5 h-5" />
           Task Categories
         </h4>

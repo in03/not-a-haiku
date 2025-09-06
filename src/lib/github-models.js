@@ -3,23 +3,24 @@
  * Uses GitHub's AI models to analyze haiku submissions
  */
 
-const GITHUB_MODELS_BASE_URL = 'https://models.inference.ai.azure.com';
+const GITHUB_MODELS_BASE_URL = 'https://models.github.ai/inference';
 
 /**
- * Get the saved GitHub PAT from localStorage
- * @returns {string|null} The PAT or null if not found
+ * Get the GitHub access token
+ * @param {string} accessToken - The GitHub OAuth access token
+ * @returns {string|null} The token or null if not found
  */
-export function getGitHubPAT() {
-  if (typeof localStorage === 'undefined') return null;
-  return localStorage.getItem('github_pat');
+export function getGitHubToken(accessToken) {
+  return accessToken || null;
 }
 
 /**
- * Check if GitHub PAT is available
- * @returns {boolean} True if PAT is available
+ * Check if GitHub token is available
+ * @param {string} accessToken - The GitHub OAuth access token
+ * @returns {boolean} True if token is available
  */
-export function hasGitHubPAT() {
-  return !!getGitHubPAT();
+export function hasGitHubToken(accessToken) {
+  return !!getGitHubToken(accessToken);
 }
 
 /**
@@ -28,9 +29,9 @@ export function hasGitHubPAT() {
  */
 export const MODELS = {
   // Good balance of capability and cost for text analysis
-  GPT_4O_MINI: 'gpt-4o-mini',
-  // Very economical option
-  GPT_35_TURBO: 'gpt-3.5-turbo'
+  GPT_4O_MINI: 'openai/gpt-4o-mini',
+  // Alternative if needed
+  GPT_4O: 'openai/gpt-4o'
 };
 
 /**
@@ -70,13 +71,14 @@ Respond ONLY with valid JSON in this exact format:
  * Analyze a haiku using GitHub Models
  * @param {string} haikuContent - The haiku text
  * @param {string} haikuTitle - The haiku title
+ * @param {string} accessToken - The GitHub OAuth access token
  * @param {string} model - The model to use (defaults to GPT-4o-mini)
  * @returns {Promise<Object>} Analysis result with rating, comment, and tags
  */
-export async function analyzeHaiku(haikuContent, haikuTitle, model = MODELS.GPT_4O_MINI) {
-  const pat = getGitHubPAT();
-  if (!pat) {
-    throw new Error('GitHub PAT not configured. Please set up your token in Settings.');
+export async function analyzeHaiku(haikuContent, haikuTitle, accessToken, model = MODELS.GPT_4O_MINI) {
+  const token = getGitHubToken(accessToken);
+  if (!token) {
+    throw new Error('GitHub authentication required. Please sign in with GitHub in Settings.');
   }
 
   const prompt = createAnalysisPrompt(haikuContent, haikuTitle);
@@ -85,9 +87,10 @@ export async function analyzeHaiku(haikuContent, haikuTitle, model = MODELS.GPT_
     const response = await fetch(`${GITHUB_MODELS_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${pat}`,
-        'User-Agent': 'Haiku-Studio/1.0'
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: model,
@@ -98,8 +101,7 @@ export async function analyzeHaiku(haikuContent, haikuTitle, model = MODELS.GPT_
           }
         ],
         max_tokens: 300,
-        temperature: 0.7,
-        response_format: { type: 'json_object' }
+        temperature: 0.7
       })
     });
 
@@ -130,7 +132,7 @@ export async function analyzeHaiku(haikuContent, haikuTitle, model = MODELS.GPT_
     
     // Limit tags to 5 and ensure they're strings
     analysis.tags = analysis.tags
-      .filter(tag => typeof tag === 'string')
+      .filter(/** @param {any} tag */ tag => typeof tag === 'string')
       .slice(0, 5);
 
     return {
@@ -141,11 +143,12 @@ export async function analyzeHaiku(haikuContent, haikuTitle, model = MODELS.GPT_
 
   } catch (error) {
     console.error('Haiku analysis error:', error);
+    const err = error instanceof Error ? error : new Error(String(error));
     
     // Return a graceful fallback for network/API errors
     return {
       success: false,
-      error: error.message,
+      error: err.message,
       fallback: {
         rating: 3,
         comment: "Unable to analyze - but every haiku has beauty!",
@@ -157,20 +160,29 @@ export async function analyzeHaiku(haikuContent, haikuTitle, model = MODELS.GPT_
 
 /**
  * Test the GitHub Models connection
+ * @param {string} accessToken - The GitHub OAuth access token
  * @returns {Promise<Object>} Connection test result
  */
-export async function testConnection() {
-  const pat = getGitHubPAT();
-  if (!pat) {
-    return { success: false, error: 'No GitHub PAT configured' };
+export async function testConnection(accessToken) {
+  const token = getGitHubToken(accessToken);
+  if (!token) {
+    return { success: false, error: 'No GitHub authentication found' };
   }
 
   try {
-    const response = await fetch(`${GITHUB_MODELS_BASE_URL}/models`, {
+    const response = await fetch(`${GITHUB_MODELS_BASE_URL}/chat/completions`, {
+      method: 'POST',
       headers: {
-        'Authorization': `Bearer ${pat}`,
-        'User-Agent': 'Haiku-Studio/1.0'
-      }
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4o-mini',
+        messages: [{ role: 'user', content: 'Test connection' }],
+        max_tokens: 1
+      })
     });
 
     if (response.ok) {
@@ -179,6 +191,7 @@ export async function testConnection() {
       return { success: false, error: `API responded with status ${response.status}` };
     }
   } catch (error) {
-    return { success: false, error: error.message };
+    const err = error instanceof Error ? error : new Error(String(error));
+    return { success: false, error: err.message };
   }
 }

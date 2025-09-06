@@ -2,9 +2,11 @@
   import { Star, Sparkles, Brain, Tag } from 'lucide-svelte';
   import { onMount } from 'svelte';
 
+  /** @type {{ rating: number; comment: string; tags: string[] } | null} */
   export let analysis = null;
   export let isVisible = false;
 
+  /** @type {boolean[]} */
   let starsAnimated = [];
   let commentVisible = false;
   let tagsVisible = false;
@@ -58,10 +60,17 @@
     tagsVisible = true;
   }
 
+  /** 
+   * @param {number} index
+   * @param {number} rating
+   */
   function getStarColor(index, rating) {
     return index < rating ? 'text-yellow-400' : 'text-gray-300';
   }
 
+  /** 
+   * @param {string} tag
+   */
   function getTagColor(tag) {
     const colors = {
       'self-care': 'bg-pink-100 text-pink-800',
@@ -89,7 +98,7 @@
       'poetry': 'bg-violet-100 text-violet-800'
     };
     
-    return colors[tag.toLowerCase()] || 'bg-gray-100 text-gray-800';
+    return colors[/** @type {keyof typeof colors} */ (tag.toLowerCase())] || 'bg-gray-100 text-gray-800';
   }
 </script>
 

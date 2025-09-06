@@ -3,10 +3,14 @@
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import UnifiedHaikuInput from '$lib/components/UnifiedHaikuInput.svelte';
+  import AnalysisResults from '$lib/components/AnalysisResults.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import { settingsStore } from '$lib/stores/settings.js';
+  import { authStore } from '$lib/stores/auth.js';
   import { poemTypes } from '$lib/poemTypes.js';
+  import { analyzeHaiku } from '$lib/github-models.js';
   import confetti from 'canvas-confetti';
+  import { onMount } from 'svelte';
   
   let title = '';
   let content = '';
@@ -23,6 +27,12 @@
   let unifiedInputComponent;
   /** @type {HTMLDivElement | null} */
   let syllableScrollContainer = null;
+  
+  // Analysis state
+  /** @type {{ rating: number; comment: string; tags: string[] } | null} */
+  let analysis = null;
+  let showAnalysis = false;
+  let isAnalyzing = false;
   
   const celebrationMessages = [
     "Well done",
@@ -43,6 +53,8 @@
   $: poemName = currentPoemType.name;
   $: poemNameLower = poemName.toLowerCase();
   $: poemArticle = articleFor(poemNameLower);
+  
+  // Auth is initialized in layout
   
   // no decorative leaves
   
@@ -81,15 +93,54 @@
         });
       }
       
-      // Reset after delay
+      // Try to analyze the haiku if user is authenticated
+      if ($authStore.isAuthenticated && $authStore.accessToken) {
+        try {
+          isAnalyzing = true;
+          showToast = true;
+          toastMessage = 'Analyzing your haiku...';
+          toastType = 'info';
+          
+          const result = /** @type {any} */ (await analyzeHaiku(content, title, $authStore.accessToken));
+          
+          if (result.success) {
+            analysis = result.analysis;
+            showAnalysis = true;
+            showToast = true;
+            toastMessage = 'Analysis complete! ✨';
+            toastType = 'success';
+          } else {
+            // Use fallback analysis if API fails
+            analysis = result.fallback;
+            showAnalysis = true;
+            showToast = true;
+            toastMessage = 'Analysis failed, but your haiku is still beautiful! 🌸';
+            toastType = 'warning';
+          }
+        } catch (error) {
+          console.error('Analysis error:', error);
+          showToast = true;
+          toastMessage = 'Analysis failed. Try signing out and back in to GitHub.';
+          toastType = 'error';
+        } finally {
+          isAnalyzing = false;
+        }
+      }
+      
+      // Reset after delay (longer if analysis is shown)
+      const resetDelay = showAnalysis ? 8000 : 3000;
       setTimeout(() => {
         if (unifiedInputComponent) {
           unifiedInputComponent.reset();
         }
         title = '';
         content = '';
+        syllableCounts = [];
         validation = { isValid: false, isComplete: false, feedback: '' };
-      }, 3000);
+        analysis = null;
+        showAnalysis = false;
+        celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
+      }, resetDelay);
     }
   }
   
@@ -223,6 +274,16 @@
       <div class="badge badge-outline">Real-time validation 🔄</div>
       <div class="badge badge-outline">Works offline 📴</div>
     </div>
+    
+    <!-- Analysis Results -->
+    {#if showAnalysis && analysis}
+      <div class="mt-8" transition:fly={{ y: 20, duration: 500, easing: cubicOut }}>
+        <AnalysisResults 
+          {analysis}
+          isVisible={showAnalysis}
+        />
+      </div>
+    {/if}
   </div>
 </div>
 

@@ -3,6 +3,8 @@
   import { validateHaiku, countHaikuSyllables, initializeSyllableCounter } from '../onnx-syllable-counter.js';
   import { settingsStore, defaultSettings } from '$lib/stores/settings.js';
   import { poemTypes } from '../poemTypes.js';
+  import { convertTextToSpeechWithTiming, playAudioWithWordTiming, streamTextToSpeechWithTiming, simpleTextToSpeechWithTiming, isValidApiKey } from '../elevenlabs-tts.js';
+  import { Volume2, VolumeX } from 'lucide-svelte';
 
   export let title = '';
   export let content = '';
@@ -31,6 +33,23 @@
   let isTemporarilyBlocked = false;
   let isLockedOverLimit = false;
   let lastWordSubmissionValidation = '';
+  
+  // TTS state
+  let isPlaying = false;
+  let highlightedWordIndex = -1;
+  /** @type {Array<{word: string, index: number, isHighlighted: boolean, isNonWord?: boolean, isSpace?: boolean, x?: number, y?: number, width?: number, height?: number, lineIndex?: number}>} */
+  let currentWords = []; // Store parsed words for highlighting
+  /** @type {HTMLCanvasElement | null} */
+  let highlightCanvas; // Reference to canvas element
+  /** @type {HTMLAudioElement | null} */
+  let currentAudio = null;
+  /** @type {string[]} */
+  let words = [];
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let clearHighlightTimeoutId = null;
+  
+  // Simple highlighting - just use reactive variables
+  // No complex DOM manipulation needed!
   
   // Subscribe to settings
   const unsubscribeSettings = settingsStore.subscribe((s) => settings = s);
@@ -81,6 +100,342 @@
         isComplete: validation.isComplete 
       });
     }
+  }
+  
+  // Handle TTS toggle
+  async function handleTTSToggle() {
+    if (!isValidApiKey(settings.elevenlabsApiKey)) {
+      dispatch('toast', {
+        message: 'Add your ElevenLabs API key in Settings to enable text-to-speech.',
+        type: 'warning'
+      });
+      return;
+    }
+    
+    if (isPlaying) {
+      stopTTS();
+    } else {
+      await startTTS();
+    }
+  }
+  
+
+
+  // Start text-to-speech
+  async function startTTS() {
+    console.log('TTS start');
+    if (!content.trim() || !isValidApiKey(settings.elevenlabsApiKey)) return;
+    
+    try {
+      cancelScheduledClearHighlighting();
+      isPlaying = true;
+      highlightedWordIndex = -1;
+      
+      const textToSpeak = content;
+      
+      // Prefer low-latency streaming playback with timing
+      // Parse text into words for highlighting
+      currentWords = parseTextIntoWords(textToSpeak);
+
+      // Set playing state
+      isPlaying = true;
+
+      // Wait for canvas to render, then setup highlighting
+      await tick();
+      if (highlightCanvas && textareaElement) {
+        setupCanvasHighlighting();
+      }
+
+      // Try the SIMPLE approach first (non-streaming, from working example)
+      await simpleTextToSpeechWithTiming(
+        textToSpeak,
+        settings.elevenlabsApiKey,
+        (/** @type {number} */ wordIndex, /** @type {number} */ lineIndex) => {
+          highlightedWordIndex = wordIndex;
+        }
+      );
+
+      // Audio finished playing (handled internally by streaming function)
+      isPlaying = false;
+      console.log('TTS completed');
+      
+    } catch (err) {
+      console.error('TTS Error:', err);
+      isPlaying = false;
+      
+      // Show specific error message
+      let errorMessage = 'Text-to-speech failed. ';
+      const error = err instanceof Error ? err : new Error(String(err));
+      
+      if (error.message.includes('401') || error.message.includes('403')) {
+        errorMessage += 'Please check your API key in Settings.';
+      } else if (error.message.includes('429')) {
+        errorMessage += 'API rate limit exceeded. Please try again later.';
+      } else if (error.message.includes('quota')) {
+        errorMessage += 'API quota exceeded. Please check your ElevenLabs account.';
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorMessage += 'Network error. Please check your connection.';
+      } else {
+        errorMessage += error.message || 'Unknown error occurred.';
+      }
+      
+      dispatch('toast', {
+        message: errorMessage,
+        type: 'error'
+      });
+    }
+  }
+  
+  // Stop text-to-speech
+  function stopTTS() {
+    // For Web Audio API implementation, we can't directly stop playback
+    // The streaming function handles cleanup internally
+    // Just reset UI state
+    console.log('TTS stop');
+    isPlaying = false;
+    currentAudio = null;
+  }
+  
+  function scheduleClearHighlighting(delay = 3000) {
+    cancelScheduledClearHighlighting();
+    clearHighlightTimeoutId = setTimeout(() => {
+      highlightedWordIndex = -1;
+      if (highlightCanvas) {
+        const ctx = highlightCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+        }
+      }
+      clearHighlightTimeoutId = null;
+    }, delay);
+  }
+  
+  function cancelScheduledClearHighlighting() {
+    if (clearHighlightTimeoutId) {
+      clearTimeout(clearHighlightTimeoutId);
+      clearHighlightTimeoutId = null;
+    }
+  }
+
+  /**
+   * Parse text into words for highlighting (similar to ElevenLabs approach)
+   */
+  /**
+   * @param {string} text
+   * @returns {Array<{word: string, index: number, isHighlighted: boolean, isNonWord?: boolean, isSpace?: boolean}>}
+   */
+  function parseTextIntoWords(text) {
+    const words = [];
+    let currentWord = '';
+    let wordIndex = 0;
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      
+      if (char.trim() === '' || ['.', ',', '?', '!', ';', ':', '\n'].includes(char)) {
+        // End of a word
+        if (currentWord !== '') {
+          words.push({
+            word: currentWord,
+            index: wordIndex,
+            isHighlighted: false
+          });
+          wordIndex++;
+          currentWord = '';
+        }
+        
+        // Add non-word characters as separate items
+        if (char !== ' ') {
+          words.push({
+            word: char,
+            index: -1, // Non-word items don't get highlighted
+            isHighlighted: false,
+            isNonWord: true
+          });
+        } else {
+          words.push({
+            word: ' ',
+            index: -1,
+            isHighlighted: false,
+            isSpace: true
+          });
+        }
+      } else {
+        currentWord += char;
+      }
+    }
+    
+    // Add the last word if any
+    if (currentWord !== '') {
+      words.push({
+        word: currentWord,
+        index: wordIndex,
+        isHighlighted: false
+      });
+    }
+    
+    return words;
+  }
+
+  // Reactive statement to update highlighting
+  $: if (currentWords.length > 0 && highlightedWordIndex >= 0) {
+    currentWords = currentWords.map(item => ({
+      ...item,
+      isHighlighted: item.index === highlightedWordIndex
+    }));
+    
+    // Draw highlights on canvas
+    if (highlightCanvas) {
+      drawCanvasHighlights();
+    }
+
+    // Reset a 1s clear timer on each index update; if updates stop, clear
+    scheduleClearHighlighting(1000);
+  }
+
+  /**
+   * Setup canvas-based highlighting with pixel-perfect measurements
+   */
+  function setupCanvasHighlighting() {
+    if (!highlightCanvas || !textareaElement) return;
+    
+    // Get textarea dimensions and styles
+    const rect = textareaElement.getBoundingClientRect();
+    const styles = window.getComputedStyle(textareaElement);
+    
+    // Setup canvas to match textarea exactly
+    highlightCanvas.width = rect.width;
+    highlightCanvas.height = rect.height;
+    highlightCanvas.style.width = rect.width + 'px';
+    highlightCanvas.style.height = rect.height + 'px';
+    
+    const ctx = highlightCanvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Copy font properties to canvas context
+    ctx.font = `${styles.fontStyle} ${styles.fontVariant} ${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`;
+    ctx.textBaseline = 'top';
+    
+    // Calculate word positions using canvas measurements
+    calculateWordPositions(ctx, styles);
+    
+    // Canvas highlighting initialized
+  }
+
+  /**
+   * Calculate exact pixel positions for each word using canvas measurements
+   */
+  /**
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {CSSStyleDeclaration} styles
+   */
+  function calculateWordPositions(ctx, styles) {
+    const padding = {
+      left: parseFloat(styles.paddingLeft),
+      top: parseFloat(styles.paddingTop)
+    };
+    const lineHeight = parseFloat(styles.lineHeight);
+    
+    let x = padding.left;
+    let y = padding.top;
+    let lineIndex = 0;
+    
+    // Add position data to each word
+    currentWords = currentWords.map(wordItem => {
+      if (wordItem.isSpace) {
+        const spaceWidth = ctx.measureText(' ').width;
+        x += spaceWidth;
+        return { ...wordItem, x, y, width: spaceWidth, height: lineHeight };
+      } else if (wordItem.word === '\n') {
+        // New line
+        x = padding.left;
+        y += lineHeight;
+        lineIndex++;
+        return { ...wordItem, x, y, width: 0, height: lineHeight };
+      } else {
+        // Regular word or punctuation
+        const metrics = ctx.measureText(wordItem.word);
+        const wordWidth = metrics.width;
+        const wordX = x;
+        
+        x += wordWidth;
+        
+        return { 
+          ...wordItem, 
+          x: wordX, 
+          y, 
+          width: wordWidth, 
+          height: lineHeight,
+          lineIndex 
+        };
+      }
+    });
+    
+    // Word positions calculated
+  }
+
+  /**
+   * Draw highlights on canvas using calculated positions
+   */
+  function drawCanvasHighlights() {
+    if (!highlightCanvas) return;
+    
+    const ctx = highlightCanvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+    
+    // Draw highlights for highlighted words
+    currentWords.forEach(wordItem => {
+      if (
+        wordItem.isHighlighted &&
+        wordItem.x !== undefined &&
+        wordItem.y !== undefined &&
+        wordItem.width !== undefined &&
+        wordItem.height !== undefined
+      ) {
+        const padding = 3;
+        const borderRadius = 4;
+        const x = wordItem.x - padding;
+        const y = wordItem.y + 1;
+        const width = wordItem.width + (padding * 2);
+        const height = wordItem.height - 2;
+        
+        // Create rounded rectangle path
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, borderRadius);
+        
+        // Fill with green gradient
+        const gradient = ctx.createLinearGradient(x, y, x, y + height);
+        gradient.addColorStop(0, 'rgba(34, 197, 94, 0.25)'); // green-500 with transparency
+        gradient.addColorStop(1, 'rgba(34, 197, 94, 0.35)');
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        // Add subtle green border
+        ctx.strokeStyle = 'rgba(34, 197, 94, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // Add inner glow effect
+        ctx.beginPath();
+        ctx.roundRect(x + 0.5, y + 0.5, width - 1, height - 1, borderRadius - 0.5);
+        ctx.strokeStyle = 'rgba(34, 197, 94, 0.2)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        
+        // Drew green highlight
+      }
+    });
+  }
+
+
+
+  // Simple highlighting - just update reactive variable
+  /** @param {number} wordIndex @param {string} text */
+  function updateHighlighting(wordIndex, text) {
+    // Highlighting is now handled by Svelte reactivity
   }
   
   // Dispatch cursor position for scrolling indicators
@@ -444,7 +799,10 @@
   
   // Cleanup
   import { onDestroy } from 'svelte';
-  onDestroy(() => unsubscribeSettings());
+  onDestroy(() => {
+    unsubscribeSettings();
+    cancelScheduledClearHighlighting();
+  });
 </script>
 
 <div 
@@ -459,6 +817,24 @@
     <div class="title-shrunk">
       {title}
     </div>
+  {/if}
+  
+  <!-- TTS Speaker Icon (top-right when content exists) -->
+  {#if step === 'content' && content.trim()}
+    <button 
+      class="tts-button"
+      class:playing={isPlaying}
+      class:has-api-key={isValidApiKey(settings.elevenlabsApiKey)}
+      on:click={handleTTSToggle}
+      aria-label={isPlaying ? 'Stop speech' : isValidApiKey(settings.elevenlabsApiKey) ? 'Speak haiku aloud' : 'Add ElevenLabs API key in Settings to enable speech'}
+      title={isPlaying ? 'Stop speech' : isValidApiKey(settings.elevenlabsApiKey) ? 'Speak haiku aloud' : 'Add ElevenLabs API key in Settings to enable speech'}
+    >
+      {#if isPlaying}
+        <VolumeX class="w-4 h-4" />
+      {:else}
+        <Volume2 class="w-4 h-4" />
+      {/if}
+    </button>
   {/if}
   
   <!-- Unified text input -->
@@ -483,21 +859,42 @@
         </button>
       {/if}
     {:else}
-      <textarea
-        bind:this={textareaElement}
-        bind:value={content}
-        on:input={autoResize}
-        on:focus={() => autoResize()}
-        on:keydown={handleKeydown}
-        on:paste={handlePaste}
-        on:click={dispatchCursorPosition}
-        on:keyup={dispatchCursorPosition}
-        placeholder="Write your {currentPoemType.name.toLowerCase()} here..."
-        class="content-textarea {isInputBlocked ? 'opacity-50 pointer-events-none' : ''}"
-        rows={expectedLines}
-        autocomplete="off"
-        spellcheck="false"
-      ></textarea>
+      <div class="textarea-container">
+        <!-- Debug info removed - highlighting working perfectly! -->
+
+        <!-- Canvas-based highlighting overlay -->
+        {#if currentWords.length > 0}
+          <canvas 
+            bind:this={highlightCanvas}
+            class="highlight-canvas"
+            style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 5;"
+          ></canvas>
+        {:else if highlightedWordIndex >= 0}
+          <div class="simple-highlight">
+            Word {highlightedWordIndex} is being spoken
+          </div>
+        {/if}
+        
+        <textarea
+          bind:this={textareaElement}
+          bind:value={content}
+          on:input={autoResize}
+          on:focus={() => autoResize()}
+          on:keydown={handleKeydown}
+          on:paste={handlePaste}
+          on:click={dispatchCursorPosition}
+          on:keyup={dispatchCursorPosition}
+          placeholder="Write your {currentPoemType.name.toLowerCase()} here..."
+          class="content-textarea {isInputBlocked ? 'opacity-50 pointer-events-none' : ''}"
+          class:has-highlight={highlightedWordIndex >= 0}
+          rows={expectedLines}
+          autocomplete="off"
+          spellcheck="false"
+          data-1p-ignore
+          data-lpignore="true"
+          data-form-type="other"
+        ></textarea>
+      </div>
       
       <!-- Submit button for completed haiku -->
       {#if validation.isValid && validation.isComplete}
@@ -598,8 +995,6 @@
   }
   
   .content-textarea {
-    font-size: 18px;
-    line-height: 1.8;
     min-height: calc(var(--expected-lines) * 32px);
     max-height: calc(var(--expected-lines) * 32px);
     overflow: hidden; /* No scrollbars */
@@ -699,6 +1094,187 @@
     40%, 60% { transform: translate3d(4px, 0, 0); }
   }
   
+  /* TTS Button */
+  .tts-button {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary, #9ca3af);
+    transition: all 0.3s ease;
+    z-index: 10;
+    opacity: 0.6;
+  }
+  
+  .tts-button:hover {
+    background: var(--bg-secondary, #f3f4f6);
+    border: 1px solid var(--border-color, #e5e7eb);
+    color: var(--text-primary, #1f2937);
+    transform: scale(1.05);
+    opacity: 1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .tts-button:not(.has-api-key):hover {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #9ca3af);
+    transform: none;
+    box-shadow: none;
+    opacity: 0.4;
+    cursor: help;
+  }
+  
+  .tts-button.playing {
+    background: #ef4444; /* Red-500 */
+    color: white;
+    border: 1px solid #ef4444;
+    opacity: 1;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  }
+  
+  .tts-button.playing:hover {
+    background: #dc2626; /* Red-600 */
+    border-color: #dc2626;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  }
+  
+
+  
+  /* Textarea Container for Character Highlighting */
+  .textarea-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    /* Shared typography metrics for textarea and overlay to ensure perfect alignment */
+    --content-font-size: 18px;
+    --content-line-height: 1.8;
+    --content-padding-block: 8px;
+    --content-padding-inline: 16px;
+  }
+
+  .simple-highlight {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(59, 130, 246, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 10;
+    pointer-events: none;
+    animation: pulse 1s infinite;
+  }
+
+  .highlight-text-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: var(--content-padding-block) var(--content-padding-inline);
+    
+    /* Match textarea font properties EXACTLY */
+    font-family: var(--font-mono);
+    font-size: var(--content-font-size);
+    font-weight: inherit;
+    font-style: inherit;
+    font-variant: inherit;
+    line-height: var(--content-line-height);
+    letter-spacing: inherit;
+    word-spacing: inherit;
+    text-rendering: inherit;
+    
+    /* Match textarea text behavior */
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    word-break: inherit;
+    text-align: inherit;
+    
+    /* Overlay properties */
+    pointer-events: none;
+    z-index: 5;
+    color: transparent;
+    background: transparent;
+    border: 1px solid transparent;
+    box-sizing: border-box;
+    overflow: hidden;
+    
+    /* Force same rendering as textarea */
+    -webkit-font-smoothing: inherit;
+    -moz-osx-font-smoothing: inherit;
+    text-size-adjust: inherit;
+  }
+
+  .highlight-text-overlay .word {
+    color: transparent;
+    background: transparent;
+    transition: all 0.2s ease;
+  }
+
+  .highlight-text-overlay .word.highlighted {
+    background: rgba(255, 235, 59, 0.4); /* Subtle yellow highlight */
+    color: transparent; /* Keep text transparent, just show highlight */
+    border-radius: 2px;
+    padding: 0px 1px;
+    box-shadow: 0 0 4px rgba(255, 235, 59, 0.3);
+    animation: highlightPulse 0.3s ease-in-out;
+  }
+
+  .highlight-text-overlay .space {
+    color: transparent;
+  }
+
+  .highlight-text-overlay .punctuation {
+    color: transparent;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+  }
+
+  @keyframes highlightPulse {
+    0% { 
+      background: rgba(255, 235, 59, 0.2);
+      box-shadow: 0 0 2px rgba(255, 235, 59, 0.2);
+    }
+    50% { 
+      background: rgba(255, 235, 59, 0.6);
+      box-shadow: 0 0 6px rgba(255, 235, 59, 0.4);
+    }
+    100% { 
+      background: rgba(255, 235, 59, 0.4);
+      box-shadow: 0 0 4px rgba(255, 235, 59, 0.3);
+    }
+  }
+
+  .content-textarea {
+    position: relative;
+    z-index: 2;
+    width: 100% !important;
+    height: 100% !important;
+    padding: var(--content-padding-block, 8px) var(--content-padding-inline, 16px) !important;
+    margin: 0 !important;
+    border: none !important;
+    outline: none !important;
+    background: transparent;
+    resize: none;
+    font-family: inherit;
+    font-size: var(--content-font-size, 18px);
+    line-height: var(--content-line-height, 1.8);
+  }
+
   /* Dark mode support */
   @media (prefers-color-scheme: dark) {
     .unified-input-container {
@@ -713,6 +1289,28 @@
     
     .title-shrunk {
       color: var(--text-primary, #f9fafb);
+    }
+    
+    .tts-button {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary, #6b7280);
+    }
+    
+    .tts-button:hover {
+      background: var(--bg-secondary, #374151);
+      border: 1px solid var(--border-color, #4b5563);
+      color: var(--text-primary, #f9fafb);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .tts-button:not(.has-api-key):hover {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary, #6b7280);
+      box-shadow: none;
+      transform: none;
+      opacity: 0.4;
     }
   }
 </style>

@@ -5,12 +5,25 @@
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 
 /**
+ * Adds pause break tags between lines for better TTS pacing
+ * @param {string} text - Input text with line breaks
+ * @param {number} pauseDuration - Pause duration in seconds (default 1.0)
+ * @returns {string} Text with SSML break tags
+ */
+function addPauseBreaks(text, pauseDuration = 1.0) {
+  // Replace newlines with SSML break tags
+  // ElevenLabs supports <break time="1.0s" /> syntax
+  return text.replace(/\n/g, `<break time="${pauseDuration}s" />\n`);
+}
+
+/**
  * SIMPLE non-streaming TTS with word timing using ElevenLabs convert_with_timestamps
  * Based on the working approach from elevenlabs-highlight-chatbot
  * @param {string} text - Text to convert to speech
  * @param {string} apiKey - ElevenLabs API key
  * @param {function} onWordHighlight - Callback for word highlighting (wordIndex, lineIndex)
  * @param {Object} options - Configuration options
+ * @param {number} [options.pauseDuration] - Pause duration between lines in seconds
  * @returns {Promise<void>}
  */
 export async function simpleTextToSpeechWithTiming(text, apiKey, onWordHighlight, options = {}) {
@@ -18,6 +31,10 @@ export async function simpleTextToSpeechWithTiming(text, apiKey, onWordHighlight
   
   const voiceId = options.voiceId || 'pNInz6obpgDQGcFmaJgB'; // Default voice
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`;
+  
+  // Add pause breaks between lines if pauseDuration is specified
+  const processedText = options.pauseDuration ? addPauseBreaks(text, options.pauseDuration) : text;
+  console.log('📝 Text with breaks:', processedText);
   
   try {
     const response = await fetch(url, {
@@ -28,7 +45,7 @@ export async function simpleTextToSpeechWithTiming(text, apiKey, onWordHighlight
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        text: text,
+        text: processedText,
         model_id: options.model || 'eleven_flash_v2_5'
       })
     });
@@ -44,7 +61,7 @@ export async function simpleTextToSpeechWithTiming(text, apiKey, onWordHighlight
       alignmentKeys: data.alignment ? Object.keys(data.alignment) : []
     });
 
-    // Parse word timing from character alignment
+    // Parse word timing from character alignment (use original text, not processed)
     const words = parseWordAlignment(data.alignment, text);
     console.log('🎯 Parsed words:', words);
 
@@ -164,8 +181,8 @@ function parseWordAlignment(alignment, originalText) {
   return words;
 }
 
-const DEFAULT_VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb'; // George voice
-const DEFAULT_MODEL_ID = 'eleven_flash_v2_5';
+const DEFAULT_VOICE_ID = 'FMgBdHe1YV2Xi0B9anXW'; // https://elevenlabs.io/app/voice-library?voiceId=FMgBdHe1YV2Xi0B9anXW
+const DEFAULT_MODEL_ID = 'eleven_flash_v2';
 
 /**
  * Tokenize text with line information preserved
@@ -243,7 +260,7 @@ export async function convertTextToSpeechWithTiming(text, apiKey, options = {}) 
   });
 
   try {
-    console.log('Getting TTS with timing data (single request)...');
+    console.log('Getting TTS with timing data...');
     
     // Create token map before sending to TTS
     const tokens = tokenizeWithLines(text);
@@ -255,6 +272,7 @@ export async function convertTextToSpeechWithTiming(text, apiKey, options = {}) 
       text: text,
       modelId: modelId,
       optimizeStreamingLatency: 2, // Lower = faster start, 0-4 range in API
+      applyTextNormalization: "on",
       voiceSettings: {
         stability: 0.5,
         similarityBoost: 0.8,

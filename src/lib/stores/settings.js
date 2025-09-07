@@ -7,7 +7,8 @@ export const defaultSettings = {
   poemType: 'haiku',
   showProgressBar: false,
   preset: 'default', // 'default' | 'focus' | 'custom'
-  elevenlabsApiKey: '' // ElevenLabs API key for text-to-speech
+  elevenlabsApiKey: '', // ElevenLabs API key for text-to-speech
+  ttsPauseDuration: 1.0 // Pause duration between lines in seconds (default 1 second)
 };
 
 export const focusPreset = {

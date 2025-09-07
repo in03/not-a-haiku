@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { poemTypes } from '../poemTypes.js';
+  import { authStore } from '$lib/stores/auth.js';
   
   const dispatch = createEventDispatcher();
   
@@ -14,7 +15,8 @@
     poemType: 'haiku',
     showProgressBar: false,
     preset: 'default',
-    elevenlabsApiKey: ''
+    elevenlabsApiKey: '',
+    ttsPauseDuration: 1.0
   };
   // Removed optional focus-only fields (no longer configurable)
 
@@ -29,6 +31,17 @@
   
   let poemTypeExpanded = false;
   let showApiKey = false;
+  
+  // Handle GitHub sign in
+  function handleGitHubSignIn() {
+    // Redirect to OAuth endpoint
+    window.location.href = '/api/auth/github';
+  }
+  
+  // Handle GitHub sign out
+  function handleGitHubSignOut() {
+    authStore.signOut();
+  }
   
   function handleClose() {
     isOpen = false;
@@ -121,7 +134,7 @@
         <h3 class="setting-label" id="poem-type-label">Poem Type</h3>
         
         <!-- Dropdown-style trigger -->
-          <button id="poem-type-trigger" aria-labelledby="poem-type-label" class="poem-type-trigger" type="button" on:click={togglePoemTypeSelector} aria-expanded={poemTypeExpanded} aria-controls="poem-type-grid">
+        <button id="poem-type-trigger" aria-labelledby="poem-type-label" class="poem-type-trigger" type="button" on:click={togglePoemTypeSelector} aria-expanded={poemTypeExpanded} aria-controls="poem-type-grid">
             <div class="poem-type-current">
               <div class="poem-type-name">{poemTypes[/** @type {keyof typeof poemTypes} */ (settings.poemType)].name}</div>
               <div class="poem-type-syllables">{poemTypes[/** @type {keyof typeof poemTypes} */ (settings.poemType)].syllables.join('-')} syllables</div>
@@ -213,6 +226,112 @@
         
       </div>
       
+      <!-- AI Analysis Settings -->
+      <div class="setting-group">
+        <h3 class="setting-label">AI Analysis</h3>
+        
+        <div class="setting-item">
+          <div class="github-auth-section">
+            <div class="github-auth-header">
+              <span class="github-auth-title">GitHub Authentication</span>
+              <div class="setting-description">
+                Sign in with GitHub to enable AI-powered haiku analysis using GitHub Models. 
+                Each user gets their own free quota.
+              </div>
+            </div>
+            
+            {#if $authStore.isAuthenticated && $authStore.user}
+              <!-- Authenticated state -->
+              <div class="github-user-card">
+                <div class="github-user-info">
+                  <img 
+                    src={$authStore.user.avatar_url} 
+                    alt={$authStore.user.name || $authStore.user.login}
+                    class="github-avatar"
+                  />
+                  <div class="github-user-details">
+                    <div class="github-user-name">
+                      {$authStore.user.name || $authStore.user.login}
+                    </div>
+                    <div class="github-user-login">@{$authStore.user.login}</div>
+                  </div>
+                </div>
+                <button 
+                  type="button"
+                  class="github-signout-button"
+                  on:click={handleGitHubSignOut}
+                  aria-label="Sign out of GitHub"
+                >
+                  Sign Out
+                </button>
+              </div>
+              
+              <div class="github-status-indicator success">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                </svg>
+                <span>Connected • AI analysis enabled • Using your GitHub Models quota</span>
+              </div>
+            {:else}
+              <!-- Unauthenticated state with rationale -->
+              <div class="github-signin-rationale">
+                <div class="rationale-content">
+                  <h4 class="rationale-title">🤖 Enable AI Analysis</h4>
+                  <p class="rationale-description">
+                    Sign in with GitHub to unlock AI-powered haiku analysis! Get instant feedback with:
+                  </p>
+                  <ul class="rationale-features">
+                    <li>⭐ Star ratings (1-5 stars)</li>
+                    <li>💭 Thoughtful AI commentary</li>
+                    <li>🏷️ Smart task categorization</li>
+                    <li>🎯 Personal quota usage</li>
+                  </ul>
+                  <p class="rationale-note">
+                    Uses <strong>GitHub Models</strong> - each user gets their own free quota. 
+                    No API keys needed, just sign in!
+                  </p>
+                </div>
+                
+                <div class="github-signin-container">
+                  <button 
+                    type="button"
+                    class="github-signin-button"
+                    on:click={handleGitHubSignIn}
+                    disabled={$authStore.isLoading}
+                  >
+                    {#if $authStore.isLoading}
+                      <div class="github-signin-spinner"></div>
+                      <span>Connecting...</span>
+                    {:else}
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0C5.374 0 0 5.373 0 12 0 17.302 3.438 21.8 8.207 23.387c.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                      </svg>
+                      <span>Sign in with GitHub</span>
+                    {/if}
+                  </button>
+                  
+                  {#if $authStore.error}
+                    <div class="github-error-message">
+                      {$authStore.error}
+                    </div>
+                  {/if}
+                </div>
+              </div>
+              
+              <div class="github-status-indicator">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>Sign in required for AI analysis • Available in navbar for convenience</span>
+              </div>
+            {/if}
+          </div>
+        </div>
+      </div>
+      
       <!-- Text-to-Speech Settings -->
       <div class="setting-group">
         <h3 class="setting-label">Text-to-Speech</h3>
@@ -222,35 +341,61 @@
             <span class="api-key-title">ElevenLabs API Key</span>
             <div class="setting-description">Required for text-to-speech functionality. Your key is stored locally and never sent to our servers.</div>
             <div class="api-key-input-container">
-              <input 
-                type={showApiKey ? 'text' : 'password'}
-                class="api-key-input"
-                bind:value={settings.elevenlabsApiKey}
-                on:input={() => settings.preset = 'custom'}
-                placeholder="sk-..."
-                autocomplete="off"
-                spellcheck="false"
-              />
-              <button 
-                type="button"
-                class="api-key-toggle"
-                on:click={() => showApiKey = !showApiKey}
-                aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
-              >
-                {#if showApiKey}
-                  <!-- Eye slash icon -->
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                  </svg>
-                {:else}
-                  <!-- Eye icon -->
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                {/if}
-              </button>
+                <input 
+                  type={showApiKey ? 'text' : 'password'}
+                  class="api-key-input"
+                  bind:value={settings.elevenlabsApiKey}
+                  on:input={() => settings.preset = 'custom'}
+                  placeholder="sk-..."
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button 
+                  type="button"
+                  class="api-key-toggle"
+                  on:click={() => showApiKey = !showApiKey}
+                  aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                >
+                  {#if showApiKey}
+                    <!-- Eye slash icon -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </svg>
+                  {:else}
+                    <!-- Eye icon -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  {/if}
+                </button>
+              </div>
+          </label>
+        </div>
+        
+        <div class="setting-item">
+          <label class="range-label">
+            <span class="range-title">Pause Between Lines</span>
+            <div class="setting-description">Duration of pause between haiku lines during text-to-speech</div>
+            <div class="range-input-container">
+                <input 
+                  type="range"
+                  class="range-input"
+                  bind:value={settings.ttsPauseDuration}
+                  on:input={() => settings.preset = 'custom'}
+                  min="0.1"
+                  max="3.0"
+                  step="0.1"
+                />
+              <div class="range-value">
+                {settings.ttsPauseDuration}s
+              </div>
+            </div>
+            <div class="range-marks">
+                <span>0.1s</span>
+                <span>1.5s</span>
+                <span>3.0s</span>
             </div>
           </label>
         </div>
@@ -701,6 +846,87 @@
     color: var(--text-primary);
   }
   
+  /* Range input styles */
+  .range-label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .range-title {
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+  
+  .range-input-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  
+  .range-input {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    outline: none;
+    -webkit-appearance: none;
+    transition: all 0.2s;
+  }
+  
+  .range-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--border-focus);
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .range-input::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .range-input::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--border-focus);
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .range-input::-moz-range-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .range-value {
+    min-width: 40px;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--border-focus);
+    font-family: 'Courier New', monospace;
+  }
+  
+  .range-marks {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+  
   /* Inline panel styles */
   /* unused: .settings-panel-content ... */
   
@@ -713,4 +939,199 @@
   /* unused */
   
   /* unused: .hidden */
+  
+  /* GitHub OAuth UI Styles */
+  .github-auth-section {
+    width: 100%;
+  }
+  
+  .github-auth-header {
+    margin-bottom: 16px;
+  }
+  
+  .github-auth-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
+  }
+  
+  .github-signin-container {
+    margin-bottom: 12px;
+  }
+  
+  .github-signin-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 16px;
+    background: #24292f;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .github-signin-button:hover:not(:disabled) {
+    background: #1f2328;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(36, 41, 47, 0.3);
+  }
+  
+  .github-signin-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+  
+  .github-signin-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .github-user-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: var(--bg-secondary, #f8fafc);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    margin-bottom: 12px;
+  }
+  
+  .github-user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .github-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--border-color, #e2e8f0);
+  }
+  
+  .github-user-details {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .github-user-name {
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
+    font-size: 14px;
+  }
+  
+  .github-user-login {
+    color: var(--text-secondary, #6b7280);
+    font-size: 12px;
+  }
+  
+  .github-signout-button {
+    padding: 6px 12px;
+    background: transparent;
+    color: var(--text-secondary, #6b7280);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .github-signout-button:hover {
+    background: var(--bg-tertiary, #f1f5f9);
+    color: var(--text-primary, #1f2937);
+  }
+  
+  .github-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary, #f1f5f9);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-secondary, #6b7280);
+  }
+  
+  .github-status-indicator.success {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #166534;
+  }
+  
+  .github-error-message {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    color: #dc2626;
+    font-size: 12px;
+  }
+  
+  .github-signin-rationale {
+    background: var(--bg-secondary, #f8fafc);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  
+  .rationale-content {
+    margin-bottom: 16px;
+  }
+  
+  .rationale-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
+    margin-bottom: 8px;
+  }
+  
+  .rationale-description {
+    font-size: 14px;
+    color: var(--text-secondary, #6b7280);
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  
+  .rationale-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 12px 0;
+  }
+  
+  .rationale-features li {
+    font-size: 13px;
+    color: var(--text-secondary, #6b7280);
+    margin-bottom: 4px;
+    padding-left: 8px;
+  }
+  
+  .rationale-note {
+    font-size: 12px;
+    color: var(--text-tertiary, #9ca3af);
+    line-height: 1.4;
+    margin: 0;
+  }
+  
+  .rationale-note strong {
+    color: var(--text-secondary, #6b7280);
+  }
 </style>

@@ -3,10 +3,14 @@
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import UnifiedHaikuInput from '$lib/components/UnifiedHaikuInput.svelte';
+  import AnalysisResults from '$lib/components/AnalysisResults.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import { settingsStore } from '$lib/stores/settings.js';
+  import { authStore } from '$lib/stores/auth.js';
   import { poemTypes } from '$lib/poemTypes.js';
+  import { analyzeHaiku } from '$lib/github-models.js';
   import confetti from 'canvas-confetti';
+  import { onMount } from 'svelte';
   
   let title = '';
   let content = '';
@@ -23,6 +27,111 @@
   let unifiedInputComponent;
   /** @type {HTMLDivElement | null} */
   let syllableScrollContainer = null;
+  
+  // Analysis state
+  /** @type {{ rating: number; comment: string; tags: string[] } | null} */
+  let analysis = null;
+  let showAnalysis = false;
+  let isAnalyzing = false;
+  
+  // Function to start a new haiku
+  function startNewHaiku() {
+    if (unifiedInputComponent) {
+      unifiedInputComponent.reset();
+    }
+    title = '';
+    content = '';
+    syllableCounts = [];
+    validation = { isValid: false, isComplete: false, feedback: '' };
+    analysis = null;
+    showAnalysis = false;
+  }
+  
+  // All available haiku templates
+  const allHaikuTemplates = [
+    {
+      id: 'lamenting-chores',
+      title: '😔 lamenting chores',
+      content: 'So much washing left.\nI don\'t want to but I must!\nEndless dirty shirts'
+    },
+    {
+      id: 'wistful-heart', 
+      title: '💘 wistful heart',
+      content: 'Pretty lonely hey\ngotta get a lady, man.\nMaybe she\'ll love me?'
+    },
+    {
+      id: 'shower-thoughts',
+      title: '🤔 shower thoughts', 
+      content: 'A cold toilet seat\nis a horrible feeling\nbut warm is much worse'
+    },
+    {
+      id: 'wifi-woes',
+      title: '📶 wifi woes',
+      content: 'Password incorrect\nBut I typed it perfectly\nRouter, you\'re a liar'
+    },
+    {
+      id: 'monday-blues',
+      title: '🙄 monday blues', 
+      content: 'Coffee cup empty\nAlarm clock screaming at me\nWeekend, please come back'
+    },
+    {
+      id: 'autocorrect-fail',
+      title: '📱 autocorrect fail',
+      content: 'Ducking phone thinks it\nknows what I want to say but\nit really doesn\'t'
+    },
+    {
+      id: 'procrastination',
+      title: '⏰ procrastination',
+      content: 'I\'ll do it later\nFamous last words of my life\nDeadline approaches'
+    },
+    {
+      id: 'social-media',
+      title: '📺 social media',
+      content: 'Endless scrolling down\nWatching other people\'s lives\nWhere did my day go?'
+    }
+  ];
+
+  // Current random selection of 3 templates
+  let currentTemplates = [];
+  
+  // Function to get 3 random templates
+  function getRandomTemplates() {
+    const shuffled = [...allHaikuTemplates].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, 3);
+  }
+  
+  // Initialize with random templates
+  currentTemplates = getRandomTemplates();
+  
+  // Track previous content state to detect when templates should refresh
+  let previousContentEmpty = true;
+  
+  // Refresh templates when content becomes empty again
+  $: if (!content.trim() && !previousContentEmpty) {
+    currentTemplates = getRandomTemplates();
+    previousContentEmpty = true;
+  } else if (content.trim()) {
+    previousContentEmpty = false;
+  }
+  
+  // Template selection handler
+  function selectTemplate(template) {
+    if (unifiedInputComponent) {
+      unifiedInputComponent.reset();
+    }
+    title = template.title;
+    content = template.content;
+    // Clear previous state
+    syllableCounts = [];
+    validation = { isValid: false, isComplete: false, feedback: '' };
+    analysis = null;
+    showAnalysis = false;
+    
+    // Trigger validation for the new content
+    if (unifiedInputComponent) {
+      unifiedInputComponent.updateContent(template.content);
+    }
+  }
   
   const celebrationMessages = [
     "Well done",
@@ -43,6 +152,8 @@
   $: poemName = currentPoemType.name;
   $: poemNameLower = poemName.toLowerCase();
   $: poemArticle = articleFor(poemNameLower);
+  
+  // Auth is initialized in layout
   
   // no decorative leaves
   
@@ -81,15 +192,53 @@
         });
       }
       
-      // Reset after delay
-      setTimeout(() => {
-        if (unifiedInputComponent) {
-          unifiedInputComponent.reset();
+      // Try to analyze the haiku if user is authenticated
+      if ($authStore.isAuthenticated && $authStore.accessToken) {
+        try {
+          isAnalyzing = true;
+          showToast = true;
+          toastMessage = 'Analyzing your haiku...';
+          toastType = 'info';
+          
+          const result = /** @type {any} */ (await analyzeHaiku(content, title, $authStore.accessToken));
+          
+          if (result.success) {
+            analysis = result.analysis;
+            showAnalysis = true;
+            showToast = true;
+            toastMessage = 'Analysis complete! ✨';
+            toastType = 'success';
+          } else {
+            // Use fallback analysis if API fails
+            analysis = result.fallback;
+            showAnalysis = true;
+            showToast = true;
+            toastMessage = 'Analysis failed, but your haiku is still beautiful! 🌸';
+            toastType = 'warning';
+          }
+        } catch (error) {
+          console.error('Analysis error:', error);
+          showToast = true;
+          toastMessage = 'Analysis failed. Try signing out and back in to GitHub.';
+          toastType = 'error';
+        } finally {
+          isAnalyzing = false;
         }
-        title = '';
-        content = '';
-        validation = { isValid: false, isComplete: false, feedback: '' };
-      }, 3000);
+      }
+      
+      // Don't auto-reset if analysis is shown - let user manually start new haiku
+      if (!showAnalysis) {
+        setTimeout(() => {
+          if (unifiedInputComponent) {
+            unifiedInputComponent.reset();
+          }
+          title = '';
+          content = '';
+          syllableCounts = [];
+          validation = { isValid: false, isComplete: false, feedback: '' };
+          celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
+        }, 3000);
+      }
     }
   }
   
@@ -150,9 +299,9 @@
   <meta name="description" content={`Write beautiful ${poemNameLower} with real-time syllable counting`} />
 </svelte:head>
 
-<div class="container mx-auto px-4 py-8 min-h-screen">
+<div class="container mx-auto px-4 py-4">
   <!-- Header copy -->
-  <div class="text-center mb-8 animate-fade-in">
+  <div class="text-center mb-4 animate-fade-in">
     <div class="flex items-center justify-center gap-3 mb-3 relative progress-title {$settingsStore.showProgressBar && progressPercentage > 0 ? 'show-progress' : ''}" 
          style="--progress: {progressPercentage}%">
       <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r {validation.isValid ? 'from-green-400 to-emerald-500' : 'from-sky-400 to-blue-500'} bg-clip-text text-transparent transition-all duration-500">
@@ -166,13 +315,11 @@
     </div>
     <div class="relative min-h-[44px] py-1 overflow-visible">
       {#if !(content && expectedSyllables.length)}
-        <div class="absolute inset-0 flex items-center justify-center gap-2 text-xs"
+        <div class="absolute inset-0 flex items-center justify-center text-sm text-base-content/60"
           in:fly={{ x: -20, duration: 400, easing: cubicOut }}
           out:fly={{ x: -20, duration: 400, easing: cubicOut }}
         >
-          <div class="badge badge-ghost">calm 🌿</div>
-          <div class="badge badge-ghost">minimal 🌱</div>
-          <div class="badge badge-ghost">zen 🌵</div>
+          Write something! Or choose an example 👇
         </div>
       {/if}
 
@@ -206,23 +353,58 @@
 
   <!-- Simplified Unified Input -->
   <div class="mx-auto max-w-3xl relative">
-    <UnifiedHaikuInput
-      bind:this={unifiedInputComponent}
-      bind:title
-      bind:content
-      on:validation={handleValidation}
-      on:syllables={handleSyllables}
-      on:toast={handleToast}
-      on:haikuSubmit={handleSubmit}
-      on:cursorMove={handleCursorMove}
-    />
+    {#if showAnalysis && analysis}
+      <!-- Analysis Results - replaces haiku input -->
+      <div transition:fly={{ y: 20, duration: 500, easing: cubicOut }}>
+        <AnalysisResults 
+          {analysis}
+          isVisible={showAnalysis}
+        />
+        
+        <!-- Start New Haiku Button -->
+        <div class="mt-6 flex justify-center">
+          <button 
+            class="btn btn-primary btn-lg"
+            on:click={startNewHaiku}
+          >
+            ✨ Write Another {poemName}
+          </button>
+        </div>
+      </div>
+    {:else}
+      <!-- Title input, haiku editor with integrated submission -->
+      <UnifiedHaikuInput
+        bind:this={unifiedInputComponent}
+        bind:title
+        bind:content
+        on:validation={handleValidation}
+        on:syllables={handleSyllables}
+        on:toast={handleToast}
+        on:haikuSubmit={handleSubmit}
+        on:cursorMove={handleCursorMove}
+      />
 
-    <!-- Features row -->
-    <div class="mt-6 flex items-center justify-center gap-2 text-xs flex-wrap">
-      <div class="badge badge-outline">Auto line breaks ⛓️</div>
-      <div class="badge badge-outline">Real-time validation 🔄</div>
-      <div class="badge badge-outline">Works offline 📴</div>
-    </div>
+      <!-- Template inspiration section -->
+      {#if !content.trim()}
+        <div class="mt-4 text-center" 
+          in:fade={{ duration: 300 }}
+          out:fade={{ duration: 200 }}
+        >
+          <!-- <p class="text-sm text-base-content/60 mb-3">or try one of these...</p> -->
+          <div class="flex items-center justify-center gap-2 flex-wrap">
+            {#each currentTemplates as template}
+              <button 
+                class="template-badge"
+                on:click={() => selectTemplate(template)}
+                title="Click to use this template"
+              >
+                {template.title}
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/if}
+    {/if}
   </div>
 </div>
 
@@ -242,6 +424,35 @@
   
   .animate-fade-in {
     animation: fade-in 0.8s ease-out;
+  }
+  
+  /* Template badge styling */
+  .template-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    background: var(--bg-secondary, hsl(var(--b2)));
+    border: 1px solid var(--border-color, hsl(var(--bc) / 0.1));
+    border-radius: 24px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary, hsl(var(--bc) / 0.7));
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+  
+  .template-badge:hover {
+    background: var(--bg-tertiary, hsl(var(--b3)));
+    border-color: var(--border-focus, hsl(var(--p)));
+    color: var(--text-primary, hsl(var(--bc)));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px hsl(var(--bc) / 0.1);
+  }
+  
+  .template-badge:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px hsl(var(--bc) / 0.1);
   }
   
   /* Responsive syllable indicator container */

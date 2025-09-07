@@ -39,19 +39,24 @@
   onDestroy(() => unsubscribe());
 </script>
 
-<section class="container mx-auto px-4 py-6">
-  <div class="flex items-center justify-between mb-4">
-    <div class="flex items-center gap-3">
-      <button class="btn btn-ghost btn-sm" on:click={handleBack} aria-label="Go back">
-        <ArrowLeft class="w-4 h-4" />
-      </button>
-      <h1 class="text-xl font-semibold">Settings</h1>
-    </div>
-    {#if saved}<span class="badge badge-success badge-outline">Saved</span>{/if}
-  </div>
-  <div class="card shadow">
-    <div class="card-body p-0">
-      <Settings isModal={false} bind:settings on:close={handleClose} />
+<section class="min-h-screen bg-base-100">
+  <div class="container mx-auto px-4 py-6">
+    <!-- Constrain content width for better readability -->
+    <div class="max-w-3xl mx-auto">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <button class="btn btn-ghost btn-sm" on:click={handleBack} aria-label="Go back">
+            <ArrowLeft class="w-4 h-4" />
+          </button>
+          <h1 class="text-xl font-semibold">Settings</h1>
+        </div>
+        {#if saved}<span class="badge badge-success badge-outline">Saved</span>{/if}
+      </div>
+      <div class="card bg-base-100 shadow-lg border border-base-300">
+        <div class="card-body p-0">
+          <Settings isModal={false} bind:settings on:close={handleClose} />
+        </div>
+      </div>
     </div>
   </div>
 </section>

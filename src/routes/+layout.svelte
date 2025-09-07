@@ -43,72 +43,94 @@
   }
 </script>
 
-<header class="w-full border-b border-base-300 bg-base-100 text-base-content">
-  <div class="container mx-auto px-4 py-3">
-    <div class="navbar p-0">
-      <div class="navbar-start">
-        <a href="{base}/" class="font-semibold text-base-content site-title-link">Not {poemArticle} {poemName}</a>
-      </div>
-      <div class="navbar-center hidden sm:flex"></div>
-      <div class="navbar-end flex items-center gap-2">
-        <nav class="hidden sm:flex items-center gap-2">
-          <!-- GitHub Authentication -->
-          {#if $authStore.isAuthenticated && $authStore.user}
-            <!-- Sign Out Button -->
-            <button 
-              class="btn btn-sm btn-outline btn-error"
-              on:click={showSignOutConfirmation}
-            >
-              <Github class="w-4 h-4" />
-              <span>Sign Out</span>
-            </button>
-          {:else}
-            <!-- Sign In Button -->
-            <button 
-              class="btn btn-sm btn-primary"
-              on:click={handleGitHubSignIn}
-              disabled={$authStore.isLoading}
-            >
-              {#if $authStore.isLoading}
-                <span class="loading loading-spinner loading-xs"></span>
-                <span>Connecting...</span>
-              {:else}
+<div class="h-screen flex flex-col">
+  <header class="w-full border-b border-base-300 bg-base-100 text-base-content flex-shrink-0">
+    <div class="container mx-auto px-4 py-3">
+      <div class="navbar p-0">
+        <div class="navbar-start">
+          <a href="{base}/" class="font-semibold text-base-content site-title-link">Not {poemArticle} {poemName}</a>
+        </div>
+        <div class="navbar-center hidden sm:flex"></div>
+        <div class="navbar-end flex items-center gap-2">
+          <nav class="hidden sm:flex items-center gap-2">
+            <!-- GitHub Authentication -->
+            {#if $authStore.isAuthenticated && $authStore.user}
+              <!-- Sign Out Button -->
+              <button 
+                class="btn btn-sm btn-outline btn-error"
+                on:click={showSignOutConfirmation}
+              >
                 <Github class="w-4 h-4" />
-                <span>Sign In</span>
-              {/if}
-            </button>
-          {/if}
-          
-          <a href="{base}/settings" class="btn btn-sm btn-ghost" aria-label="Settings" title="Settings">
-            <SettingsIcon class="w-4 h-4" />
-          </a>
-          <a href="https://github.com/in03/not-a-haiku" class="btn btn-sm btn-ghost" rel="noopener noreferrer" target="_blank" aria-label="GitHub" title="GitHub">
-            <Github class="w-4 h-4" />
-          </a>
-          <a href="https://en.wikipedia.org/wiki/Haiku" class="btn btn-sm btn-ghost" aria-label="Docs" title="Docs">
-            <BookOpen class="w-4 h-4" />
-          </a>
-        </nav>
-        <button class="btn btn-sm btn-ghost sm:hidden" aria-label="Open menu" on:click={openMenu}>
-          <Menu class="w-5 h-5" />
-        </button>
+                <span>Sign Out</span>
+              </button>
+            {:else}
+              <!-- Sign In Button -->
+              <button 
+                class="btn btn-sm btn-primary"
+                on:click={handleGitHubSignIn}
+                disabled={$authStore.isLoading}
+              >
+                {#if $authStore.isLoading}
+                  <span class="loading loading-spinner loading-xs"></span>
+                  <span>Connecting...</span>
+                {:else}
+                  <Github class="w-4 h-4" />
+                  <span>Sign In</span>
+                {/if}
+              </button>
+            {/if}
+            
+            <a href="{base}/settings" class="btn btn-sm btn-ghost" aria-label="Settings" title="Settings">
+              <SettingsIcon class="w-4 h-4" />
+            </a>
+            <a href="https://github.com/in03/not-a-haiku" class="btn btn-sm btn-ghost" rel="noopener noreferrer" target="_blank" aria-label="GitHub" title="GitHub">
+              <Github class="w-4 h-4" />
+            </a>
+            <a href="https://en.wikipedia.org/wiki/Haiku" class="btn btn-sm btn-ghost" aria-label="Docs" title="Docs">
+              <BookOpen class="w-4 h-4" />
+            </a>
+          </nav>
+          <button class="btn btn-sm btn-ghost sm:hidden" aria-label="Open menu" on:click={openMenu}>
+            <Menu class="w-5 h-5" />
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-</header>
+  </header>
 
-<main class="min-h-screen bg-base-100 text-base-content">
-  <slot />
-</main>
+  <main class="bg-base-100 text-base-content flex-grow overflow-auto">
+    <slot />
+  </main>
 
-<footer class="w-full border-t border-base-300 bg-base-100 text-base-content py-4">
-  <div class="container mx-auto px-4 text-center">
-    <p class="text-sm text-base-content/70">
-      Made with <span class="text-red-500">♥</span> by 
-      <a href="https://calebtrevatt.com" target="_blank" rel="noopener noreferrer" class="link link-hover text-base-content font-medium">Caleb Trevatt</a>
-    </p>
+  <footer class="w-full border-t border-base-300 bg-base-100 text-base-content py-2 flex-shrink-0">
+  <div class="container mx-auto px-4">
+    <!-- Single row with features left, credit right -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm">
+      <!-- Feature indicators -->
+      <div class="flex items-center gap-3 sm:gap-4 text-xs text-base-content/50">
+        <span class="flex items-center gap-1">
+          <span class="w-1 h-1 bg-green-500 rounded-full"></span>
+          Auto line breaks
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="w-1 h-1 bg-blue-500 rounded-full"></span>
+          Real-time validation
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="w-1 h-1 bg-orange-500 rounded-full"></span>
+          Works offline
+        </span>
+      </div>
+      
+      <!-- Credit -->
+      <p class="text-sm text-base-content/70">
+        Made with <span class="text-red-500">♥</span> by 
+        <a href="https://calebtrevatt.com" target="_blank" rel="noopener noreferrer" class="link link-hover text-base-content font-medium">Caleb Trevatt</a>
+      </p>
+    </div>
   </div>
-</footer>
+  </footer>
+</div>
 
 {#if isMenuOpen}
   <div class="drawer-overlay" role="button" tabindex="0" aria-label="Close menu" on:click={closeMenu} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && closeMenu()}></div>

@@ -792,6 +792,20 @@
     syllableCounts = [];
   }
   
+  // Update content and trigger validation
+  export function updateContent(newContent) {
+    content = newContent;
+    isExpanded = true;
+    step = 'content';
+    
+    // Trigger syllable counting and validation
+    tick().then(() => {
+      if (textareaElement) {
+        handleInput({ target: textareaElement });
+      }
+    });
+  }
+  
   onMount(async () => {
     try {
       await initializeSyllableCounter();
@@ -846,7 +860,7 @@
       <input
         bind:value={title}
         on:keydown={handleKeydown}
-        placeholder={`Give your ${currentPoemType.name.toLowerCase()} a title...`}
+        placeholder={`Give your ${currentPoemType.name.toLowerCase()} a title`}
         maxlength="40"
         class="title-input"
         autocomplete="off"

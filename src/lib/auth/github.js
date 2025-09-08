@@ -30,7 +30,7 @@ export function getGitHubAuthUrl(state) {
   const params = new URLSearchParams({
     client_id: GITHUB_CLIENT_ID,
     redirect_uri: REDIRECT_URI,
-    scope: 'read:user', // GitHub Models access is currently tied to user account, no special scope needed
+    scope: 'read:user gist', // read:user for GitHub Models, gist for creating/managing gists
     state: state,
     allow_signup: 'true'
   });

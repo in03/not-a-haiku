@@ -7,6 +7,7 @@
   import Toast from '$lib/components/Toast.svelte';
   import { settingsStore } from '$lib/stores/settings.js';
   import { authStore } from '$lib/stores/auth.js';
+  import { haikuStore } from '$lib/stores/haiku-db.js';
   import { poemTypes } from '$lib/poemTypes.js';
   import { analyzeHaiku } from '$lib/github-models.js';
   import confetti from 'canvas-confetti';
@@ -32,6 +33,9 @@
   /** @type {{ rating: number; comment: string; tags: string[] } | null} */
   let analysis = null;
   let showAnalysis = false;
+  
+  // Current haiku ID for updating with analysis
+  let currentHaikuId = null;
   let isAnalyzing = false;
   
   // Function to start a new haiku
@@ -45,6 +49,7 @@
     validation = { isValid: false, isComplete: false, feedback: '' };
     analysis = null;
     showAnalysis = false;
+    currentHaikuId = null;
   }
   
   // All available haiku templates
@@ -177,6 +182,21 @@
   /** @param {CustomEvent<any>} event */
   async function handleSubmit(event) {
     if (event.detail.isComplete) {
+      // Save the haiku to IndexedDB
+      try {
+        const lines = content.split('\n').filter(line => line.trim());
+        const savedHaiku = await haikuStore.create({
+          title: title || 'Untitled Haiku',
+          lines: lines,
+          text: content,
+          tags: [], // Start with no tags, user can add them in grid view
+          status: $settingsStore.enableTaskTracking ? 'todo' : 'done'
+        });
+        currentHaikuId = savedHaiku.id;
+      } catch (error) {
+        console.error('Failed to save haiku:', error);
+      }
+      
       // Show success message
       showToast = true;
       toastMessage = celebrationMessages[celebrationIndex];
@@ -208,6 +228,21 @@
             showToast = true;
             toastMessage = 'Analysis complete! ✨';
             toastType = 'success';
+            
+            // Update the saved haiku with analysis results
+            if (currentHaikuId) {
+              try {
+                await haikuStore.update(currentHaikuId, {
+                  analysis: {
+                    rating: analysis.rating,
+                    commentary: analysis.comment,
+                    suggestedTags: analysis.tags
+                  }
+                });
+              } catch (error) {
+                console.error('Failed to update haiku with analysis:', error);
+              }
+            }
           } else {
             // Use fallback analysis if API fails
             analysis = result.fallback;
@@ -215,6 +250,21 @@
             showToast = true;
             toastMessage = 'Analysis failed, but your haiku is still beautiful! 🌸';
             toastType = 'warning';
+            
+            // Update the saved haiku with fallback analysis
+            if (currentHaikuId) {
+              try {
+                await haikuStore.update(currentHaikuId, {
+                  analysis: {
+                    rating: analysis.rating,
+                    commentary: analysis.comment,
+                    suggestedTags: analysis.tags
+                  }
+                });
+              } catch (error) {
+                console.error('Failed to update haiku with fallback analysis:', error);
+              }
+            }
           }
         } catch (error) {
           console.error('Analysis error:', error);
@@ -291,6 +341,14 @@
     return Math.min((totalCurrent / totalExpected) * 100, 100);
   })();
   
+  // Detect when content is expanding to adjust centering
+  // Trigger expansion when there's actual content being typed or analysis is shown
+  $: contentExpanding = (content.trim().length > 0 && content.includes('\n')) || 
+                       showAnalysis || 
+                       validation.isComplete ||
+                       syllableCounts.length > 0 ||
+                       (title.trim().length > 0 && content.trim().length > 0);
+  
 
 </script>
 
@@ -299,6 +357,7 @@
   <meta name="description" content={`Write beautiful ${poemNameLower} with real-time syllable counting`} />
 </svelte:head>
 
+<div class="main-content-wrapper {contentExpanding ? 'content-expanding' : ''}">
 <div class="container mx-auto px-4 py-4">
   <!-- Header copy -->
   <div class="text-center mb-4 animate-fade-in">
@@ -406,6 +465,7 @@
       {/if}
     {/if}
   </div>
+</div>
 </div>
 
 <!-- Toast Notifications -->
@@ -538,4 +598,69 @@
   }
   
   /* removed decorative leaves */
+  
+  /* Main content wrapper for better vertical centering */
+  .main-content-wrapper {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 0;
+    transition: padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Container that grows from center */
+  .main-content-wrapper .container {
+    width: 100%;
+    max-width: 1200px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center center;
+  }
+  
+  /* When content is expanding, keep center anchor but reduce padding */
+  .main-content-wrapper.content-expanding {
+    /* Keep center justification - this is key for center expansion */
+    justify-content: center;
+    /* Reduce padding to give more room for content while maintaining center anchor */
+    padding: 1rem 0;
+  }
+  
+  /* Add subtle scale effect for smoother expansion feeling */
+  .main-content-wrapper:not(.content-expanding) .container {
+    transform: scale(0.98);
+  }
+  
+  .main-content-wrapper.content-expanding .container {
+    transform: scale(1);
+  }
+  
+  /* Mobile adjustments - use less aggressive centering on small screens */
+  @media (max-height: 600px) {
+    .main-content-wrapper {
+      justify-content: flex-start;
+      padding: 2rem 0 1rem 0;
+    }
+    
+    .main-content-wrapper.content-expanding {
+      padding: 1rem 0;
+    }
+    
+    /* Reduce scale effect on mobile */
+    .main-content-wrapper:not(.content-expanding) .container {
+      transform: scale(1);
+    }
+  }
+  
+  /* On very small viewports, prioritize usability */
+  @media (max-height: 500px) {
+    .main-content-wrapper {
+      justify-content: flex-start;
+      padding: 1rem 0;
+    }
+    
+    .main-content-wrapper.content-expanding {
+      padding: 0.5rem 0;
+    }
+  }
 </style>

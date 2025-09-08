@@ -12,6 +12,7 @@
 import * as ort from 'onnxruntime-web';
 import cmuDict from './data/cmu-syllables.json';
 import modelMetadata from '../ml/model_metadata.json';
+import { base } from '$app/paths';
 
 // Model session cache
 let modelSession = null;
@@ -31,7 +32,8 @@ async function initializeModel() {
   
   try {
     // Load the ONNX model from static directory
-    const modelPath = '/syllable_model.onnx';
+    // Handle base path for GitHub Pages deployment
+    const modelPath = `${base}/syllable_model.onnx`;
     modelSession = await ort.InferenceSession.create(modelPath);
     isModelLoaded = true;
     console.log('ONNX syllable model loaded successfully');

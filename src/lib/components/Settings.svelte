@@ -1,7 +1,9 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { poemTypes } from '../poemTypes.js';
   import { authStore } from '$lib/stores/auth.js';
+  import { haikuStore } from '$lib/stores/haiku-db.js';
+  import { gitHubSync } from '$lib/github-sync.js';
   
   const dispatch = createEventDispatcher();
   
@@ -14,23 +16,60 @@
     enableConfetti: true,
     poemType: 'haiku',
     showProgressBar: false,
-    preset: 'default',
     elevenlabsApiKey: '',
-    ttsPauseDuration: 1.0
+    ttsPauseDuration: 1.0,
+    enableTaskTracking: false,
+    enableTTS: false,
+    enableCritique: false,
+    autoSubmit: false
   };
-  // Removed optional focus-only fields (no longer configurable)
 
-  import { presets, settingsStore } from '$lib/stores/settings.js';
-
-  // Handle preset changes by using the store's applyPreset method
-  let lastPreset = settings.preset;
-  $: if (settings.preset !== lastPreset && (settings.preset === 'default' || settings.preset === 'focus')) {
-    settingsStore.applyPreset(settings.preset);
-    lastPreset = settings.preset;
-  }
-  
+  let activeTab = 'editor';
   let poemTypeExpanded = false;
   let showApiKey = false;
+  
+  // Sync state
+  let isSyncing = false;
+  let syncStatus = /** @type {any} */ (null);
+  let haikuStats = /** @type {{ total: number; [key: string]: any }} */ ({ total: 0 });
+  
+  // Load haiku stats on mount
+  onMount(async () => {
+    try {
+      haikuStats = /** @type {any} */ (await haikuStore.getStats());
+      if ($authStore.isAuthenticated) {
+        syncStatus = await gitHubSync.getSyncStatus();
+      }
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  });
+  
+  // Update stats when auth changes
+  $: if ($authStore.isAuthenticated && !syncStatus) {
+    gitHubSync.getSyncStatus().then(status => {
+      syncStatus = status;
+    }).catch(console.error);
+  }
+  
+  // Handle sync action
+  async function handleSync() {
+    if (isSyncing || !$authStore.isAuthenticated) return;
+    
+    isSyncing = true;
+    try {
+      const result = await gitHubSync.sync();
+      console.log('Sync result:', result.message);
+      
+      // Refresh stats after sync
+      syncStatus = await gitHubSync.getSyncStatus();
+      haikuStats = /** @type {any} */ (await haikuStore.getStats());
+    } catch (error) {
+      console.error('Sync failed:', error);
+    } finally {
+      isSyncing = false;
+    }
+  }
   
   // Handle GitHub sign in
   function handleGitHubSignIn() {
@@ -55,7 +94,6 @@
   /** @param {string} key */
   function selectPoemType(key) {
     settings.poemType = key;
-    settings.preset = 'custom';
     poemTypeExpanded = false;
   }
   
@@ -75,6 +113,18 @@
     document.addEventListener('keydown', handleKeydown);
   } else if (typeof window !== 'undefined') {
     document.removeEventListener('keydown', handleKeydown);
+  }
+
+  // Helper function to check if feature is disabled due to auth/API key requirements
+  /** @param {string} feature */
+  function isFeatureDisabled(feature) {
+    if (feature === 'critique' || feature === 'sync') {
+      return !$authStore.isAuthenticated;
+    }
+    if (feature === 'tts') {
+      return !settings.elevenlabsApiKey || settings.elevenlabsApiKey.trim() === '';
+    }
+    return false;
   }
 </script>
 
@@ -106,246 +156,428 @@
 {:else}
   <!-- Inline panel version (content only) -->
   <div class="settings-content-wrapper">
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+      <button class="tab-button {activeTab === 'editor' ? 'active' : ''}" on:click={() => activeTab = 'editor'}>
+        Editor
+      </button>
+      <button class="tab-button {activeTab === 'features' ? 'active' : ''}" on:click={() => activeTab = 'features'}>
+        Features
+      </button>
+      <button class="tab-button {activeTab === 'tts' ? 'active' : ''}" on:click={() => activeTab = 'tts'}>
+        TTS
+      </button>
+      <button class="tab-button {activeTab === 'sync' ? 'active' : ''}" on:click={() => activeTab = 'sync'}>
+        Sync
+      </button>
+      <button class="tab-button {activeTab === 'auth' ? 'active' : ''}" on:click={() => activeTab = 'auth'}>
+        Auth
+      </button>
+    </div>
+
     <div class="settings-content">
-      <!-- Presets -->
-      <div class="setting-group">
-        <h3 id="preset-group-label" class="setting-label">Preset</h3>
-        <div class="radio-group" role="radiogroup" aria-labelledby="preset-group-label">
-          <label class="radio-option">
-            <input type="radio" class="radio-input" bind:group={settings.preset} value="default" />
-            <span class="radio-custom"></span>
-            <span class="radio-text">Default</span>
-          </label>
-          <label class="radio-option">
-            <input type="radio" class="radio-input" bind:group={settings.preset} value="focus" />
-            <span class="radio-custom"></span>
-            <span class="radio-text">Focus</span>
-          </label>
-          <label class="radio-option">
-            <input type="radio" class="radio-input" bind:group={settings.preset} value="custom" />
-            <span class="radio-custom"></span>
-            <span class="radio-text">Custom</span>
-          </label>
-        </div>
-        <div class="setting-description">Choose a preset; changing individual settings switches to Custom.</div>
-      </div>
-      <!-- Poem Type Selection -->
-      <div class="setting-group">
-        <h3 class="setting-label" id="poem-type-label">Poem Type</h3>
-        
-        <!-- Dropdown-style trigger -->
-        <button id="poem-type-trigger" aria-labelledby="poem-type-label" class="poem-type-trigger" type="button" on:click={togglePoemTypeSelector} aria-expanded={poemTypeExpanded} aria-controls="poem-type-grid">
-            <div class="poem-type-current">
-              <div class="poem-type-name">{poemTypes[/** @type {keyof typeof poemTypes} */ (settings.poemType)].name}</div>
-              <div class="poem-type-syllables">{poemTypes[/** @type {keyof typeof poemTypes} */ (settings.poemType)].syllables.join('-')} syllables</div>
-            </div>
-          <svg class="dropdown-icon {poemTypeExpanded ? 'expanded' : ''}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6,9 12,15 18,9"></polyline>
-          </svg>
-        </button>
-        
-        <!-- Expandable grid -->
-        {#if poemTypeExpanded}
-          <div id="poem-type-grid" class="poem-type-grid">
-            {#each Object.entries(poemTypes) as [key, type]}
-              <button 
-                class="poem-type-option {settings.poemType === key ? 'selected' : ''}"
-                on:click={() => selectPoemType(key)}
-              >
-                <div class="poem-type-name">{type.name}</div>
-                <div class="poem-type-description">{type.description}</div>
-                <div class="poem-type-syllables">
-                  {type.syllables.join('-')} syllables
-                </div>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-      
-      <!-- Behavior Settings -->
-      <div class="setting-group">
-        <h3 class="setting-label">Behavior</h3>
-        
-        <div class="setting-item">
-          <label class="toggle-label">
-            <input type="checkbox" class="toggle-input" bind:checked={settings.autoBackspace} on:change={() => settings.preset = 'custom'} />
-            <span class="toggle-slider"></span>
-            <span class="toggle-text">
-              <span class="toggle-title">Auto-backspace last word on over-limit</span>
-              <div class="setting-description">Automatically removes the last word when syllable limit is exceeded</div>
-            </span>
-          </label>
-        </div>
-        
-        <div class="setting-item">
-          <label class="toggle-label">
-            <input type="checkbox" class="toggle-input" bind:checked={settings.enableShake} on:change={() => settings.preset = 'custom'} />
-            <span class="toggle-slider"></span>
-            <span class="toggle-text">
-              <span class="toggle-title">Enable shake animation</span>
-              <div class="setting-description">Shake the editor when limits are reached</div>
-            </span>
-          </label>
-        </div>
-        
-        <div class="setting-item">
-          <label class="toggle-label">
-            <input 
-              type="checkbox" 
-              bind:checked={settings.enableConfetti}
-              class="toggle-input"
-              on:change={() => settings.preset = 'custom'}
-            />
-            <span class="toggle-slider"></span>
-            <span class="toggle-text">
-              <span class="toggle-title">Enable confetti celebration</span>
-              <div class="setting-description">
-                Show confetti when you submit a completed poem
-              </div>
-            </span>
-          </label>
-        </div>
-        
-        <!-- Explicit controls that focus preset toggles -->
-        <div class="setting-item">
-          <label class="toggle-label">
-            <input 
-              type="checkbox" 
-              bind:checked={settings.showProgressBar}
-              class="toggle-input"
-              on:change={() => settings.preset = 'custom'}
-            />
-            <span class="toggle-slider"></span>
-            <span class="toggle-text">
-              <span class="toggle-title">Show progress bar</span>
-              <div class="setting-description">Displays a thin progress bar that fills as syllables match.</div>
-            </span>
-          </label>
-        </div>
-        
-      </div>
-      
-      <!-- AI Analysis Settings -->
-      <div class="setting-group">
-        <h3 class="setting-label">AI Analysis</h3>
-        
-        <div class="setting-item">
-          <div class="github-auth-section">
-            <div class="github-auth-header">
-              <span class="github-auth-title">GitHub Authentication</span>
-              <div class="setting-description">
-                Sign in with GitHub to enable AI-powered haiku analysis using GitHub Models. 
-                Each user gets their own free quota.
-              </div>
-            </div>
+      <!-- Editor Tab -->
+      {#if activeTab === 'editor'}
+        <div class="setting-group">
+          <h3 class="setting-label">Editor Settings</h3>
+          
+          <!-- Poem Type Selection -->
+          <div class="setting-item">
+            <div class="setting-item-label" id="poem-type-label">Poem Type</div>
             
-            {#if $authStore.isAuthenticated && $authStore.user}
-              <!-- Authenticated state -->
-              <div class="github-user-card">
-                <div class="github-user-info">
-                  <img 
-                    src={$authStore.user.avatar_url} 
-                    alt={$authStore.user.name || $authStore.user.login}
-                    class="github-avatar"
-                  />
-                  <div class="github-user-details">
-                    <div class="github-user-name">
-                      {$authStore.user.name || $authStore.user.login}
-                    </div>
-                    <div class="github-user-login">@{$authStore.user.login}</div>
-                  </div>
+            <!-- Dropdown-style trigger -->
+            <button id="poem-type-trigger" aria-labelledby="poem-type-label" class="poem-type-trigger" type="button" on:click={togglePoemTypeSelector} aria-expanded={poemTypeExpanded} aria-controls="poem-type-grid">
+                <div class="poem-type-current">
+                  <div class="poem-type-name">{poemTypes[/** @type {keyof typeof poemTypes} */ (settings.poemType)].name}</div>
+                  <div class="poem-type-syllables">{poemTypes[/** @type {keyof typeof poemTypes} */ (settings.poemType)].syllables.join('-')} syllables</div>
                 </div>
-                <button 
-                  type="button"
-                  class="github-signout-button"
-                  on:click={handleGitHubSignOut}
-                  aria-label="Sign out of GitHub"
-                >
-                  Sign Out
-                </button>
-              </div>
-              
-              <div class="github-status-indicator success">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                  <polyline points="22,4 12,14.01 9,11.01"></polyline>
-                </svg>
-                <span>Connected • AI analysis enabled • Using your GitHub Models quota</span>
-              </div>
-            {:else}
-              <!-- Unauthenticated state with rationale -->
-              <div class="github-signin-rationale">
-                <div class="rationale-content">
-                  <h4 class="rationale-title">🤖 Enable AI Analysis</h4>
-                  <p class="rationale-description">
-                    Sign in with GitHub to unlock AI-powered haiku analysis! Get instant feedback with:
-                  </p>
-                  <ul class="rationale-features">
-                    <li>⭐ Star ratings (1-5 stars)</li>
-                    <li>💭 Thoughtful AI commentary</li>
-                    <li>🏷️ Smart task categorization</li>
-                    <li>🎯 Personal quota usage</li>
-                  </ul>
-                  <p class="rationale-note">
-                    Uses <strong>GitHub Models</strong> - each user gets their own free quota. 
-                    No API keys needed, just sign in!
-                  </p>
-                </div>
-                
-                <div class="github-signin-container">
+              <svg class="dropdown-icon {poemTypeExpanded ? 'expanded' : ''}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6,9 12,15 18,9"></polyline>
+              </svg>
+            </button>
+            
+            <!-- Expandable grid -->
+            {#if poemTypeExpanded}
+              <div id="poem-type-grid" class="poem-type-grid">
+                {#each Object.entries(poemTypes) as [key, type]}
                   <button 
-                    type="button"
-                    class="github-signin-button"
-                    on:click={handleGitHubSignIn}
-                    disabled={$authStore.isLoading}
+                    class="poem-type-option {settings.poemType === key ? 'selected' : ''}"
+                    on:click={() => selectPoemType(key)}
                   >
-                    {#if $authStore.isLoading}
-                      <div class="github-signin-spinner"></div>
-                      <span>Connecting...</span>
-                    {:else}
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 0C5.374 0 0 5.373 0 12 0 17.302 3.438 21.8 8.207 23.387c.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-                      </svg>
-                      <span>Sign in with GitHub</span>
-                    {/if}
-                  </button>
-                  
-                  {#if $authStore.error}
-                    <div class="github-error-message">
-                      {$authStore.error}
+                    <div class="poem-type-name">{type.name}</div>
+                    <div class="poem-type-description">{type.description}</div>
+                    <div class="poem-type-syllables">
+                      {type.syllables.join('-')} syllables
                     </div>
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+          <div class="setting-item">
+            <label class="toggle-label">
+              <input type="checkbox" class="toggle-input" bind:checked={settings.autoBackspace} />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">
+                <span class="toggle-title">Auto backspace on over-limit</span>
+                <div class="setting-description">Automatically removes the last word when syllable limit is exceeded</div>
+              </span>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="toggle-label">
+              <input type="checkbox" bind:checked={settings.showProgressBar} class="toggle-input" />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">
+                <span class="toggle-title">Show progress bar</span>
+                <div class="setting-description">Displays a thin progress bar that fills as syllables match.</div>
+              </span>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="toggle-label">
+              <input type="checkbox" class="toggle-input" bind:checked={settings.enableShake} />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">
+                <span class="toggle-title">Enable shake animation</span>
+                <div class="setting-description">Shake the editor when limits are reached</div>
+              </span>
+            </label>
+          </div>
+          
+          <div class="setting-item">
+            <label class="toggle-label">
+              <input type="checkbox" bind:checked={settings.enableConfetti} class="toggle-input" />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">
+                <span class="toggle-title">Enable celebration (confetti)</span>
+                <div class="setting-description">Show confetti when you submit a completed poem</div>
+              </span>
+            </label>
+          </div>
+          
+          <div class="setting-item">
+            <label class="toggle-label">
+              <input type="checkbox" bind:checked={settings.autoSubmit} class="toggle-input" />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">
+                <span class="toggle-title">Auto submit on valid</span>
+                <div class="setting-description">Automatically submits poems for analysis when syllable pattern is complete</div>
+              </span>
+            </label>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Features Tab -->
+      {#if activeTab === 'features'}
+        <div class="setting-group">
+          <h3 class="setting-label">Features</h3>
+          
+          <div class="setting-item">
+            <label class="toggle-label">
+              <input type="checkbox" bind:checked={settings.enableTaskTracking} class="toggle-input" />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">
+                <span class="toggle-title">Enable task tracking</span>
+                <div class="setting-description">Track haikus as tasks with todo/in-progress/done status. Adds checkboxes to grid view and status filtering.</div>
+              </span>
+            </label>
+          </div>
+          
+          <div class="setting-item">
+            <label class="toggle-label {isFeatureDisabled('critique') ? 'disabled' : ''}">
+              <input 
+                type="checkbox" 
+                bind:checked={settings.enableCritique} 
+                class="toggle-input"
+                disabled={isFeatureDisabled('critique')}
+              />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">
+                <span class="toggle-title">Enable AI Analysis</span>
+                <div class="setting-description">
+                  Get AI analysis and critique of your haikus. 
+                  {#if isFeatureDisabled('critique')}
+                    <span class="requirement-hint">Requires GitHub authentication</span>
+                  {:else}
+                    Note: This feature uses GitHub Models quota.
+                  {/if}
+                </div>
+              </span>
+            </label>
+          </div>
+        </div>
+      {/if}
+
+      <!-- TTS Tab -->
+      {#if activeTab === 'tts'}
+        <div class="setting-group">
+          <h3 class="setting-label">Text to Speech</h3>
+          
+          <div class="setting-item">
+            <label class="toggle-label {isFeatureDisabled('tts') ? 'disabled' : ''}">
+              <input 
+                type="checkbox" 
+                bind:checked={settings.enableTTS} 
+                class="toggle-input"
+                disabled={isFeatureDisabled('tts')}
+              />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">
+                <span class="toggle-title">Enable TTS</span>
+                <div class="setting-description">
+                  Read haikus aloud using ElevenLabs text-to-speech
+                  {#if isFeatureDisabled('tts')}
+                    <span class="requirement-hint">Requires ElevenLabs API key</span>
+                  {/if}
+                </div>
+              </span>
+            </label>
+          </div>
+          
+          <div class="setting-item">
+            <div class="range-label">
+              <span class="range-title">Pause between lines</span>
+              <div class="setting-description">Duration of pause between haiku lines during text-to-speech</div>
+              <div class="range-input-container">
+                <input 
+                  type="range"
+                  class="range-input"
+                  bind:value={settings.ttsPauseDuration}
+                  min="0.1"
+                  max="3.0"
+                  step="0.1"
+                />
+                <div class="range-value">
+                  {settings.ttsPauseDuration}s
+                </div>
+              </div>
+              <div class="range-marks">
+                <span>0.1s</span>
+                <span>1.5s</span>
+                <span>3.0s</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Sync Tab -->
+      {#if activeTab === 'sync'}
+        <div class="setting-group">
+          <h3 class="setting-label">Storage & Sync</h3>
+          
+          <div class="setting-item">
+            <div class="local-storage-info">
+              <h4 class="storage-info-title">Local Storage</h4>
+              <p class="storage-info-text">
+                Your haikus are stored locally in your browser using IndexedDB. 
+                They'll persist between sessions and work offline.
+              </p>
+              <div class="storage-stats">
+                <span class="stat-item">
+                  <span class="stat-label">Stored locally:</span>
+                  <span class="stat-value">{haikuStats.total} haikus</span>
+                </span>
+                {#if syncStatus}
+                  <span class="stat-item">
+                    <span class="stat-label">Synced:</span>
+                    <span class="stat-value">{syncStatus.synced} haikus</span>
+                  </span>
+                  <span class="stat-item">
+                    <span class="stat-label">Unsynced:</span>
+                    <span class="stat-value">{syncStatus.unsynced} haikus</span>
+                  </span>
+                {/if}
+              </div>
+            </div>
+          </div>
+          
+          <div class="setting-item">
+            <div class="github-sync-section">
+              <div class="github-sync-header">
+                <span class="github-sync-title">GitHub Sync</span>
+                <div class="setting-description">
+                  Sync your haikus to GitHub using private gists. 
+                  {#if isFeatureDisabled('sync')}
+                    <span class="requirement-hint">Requires GitHub authentication</span>
+                  {:else}
+                    All haikus are stored locally first for offline access.
                   {/if}
                 </div>
               </div>
               
-              <div class="github-status-indicator">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="8" x2="12" y2="12"></line>
-                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <span>Sign in required for AI analysis • Available in navbar for convenience</span>
-              </div>
-            {/if}
+              {#if $authStore.isAuthenticated && $authStore.user}
+                <!-- Authenticated state -->
+                <div class="github-sync-status">
+                  <div class="sync-status-indicator success">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                      <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                    </svg>
+                    <span>GitHub sync available • Private gists will be used for backup</span>
+                  </div>
+                  
+                  <div class="sync-controls">
+                    <button 
+                      type="button" 
+                      class="sync-button" 
+                      title="Sync now"
+                      on:click={handleSync}
+                      disabled={isSyncing}
+                    >
+                      {#if isSyncing}
+                        <div class="sync-spinner"></div>
+                        Syncing...
+                      {:else}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-2.2M22 12.5a10 10 0 0 1-18.8 2.2"/>
+                        </svg>
+                        Sync Now
+                      {/if}
+                    </button>
+                    <span class="sync-info">
+                      Last sync: {syncStatus?.lastSyncTime ? new Date(syncStatus.lastSyncTime).toLocaleString() : 'Never'}
+                    </span>
+                  </div>
+                </div>
+              {:else}
+                <!-- Unauthenticated state -->
+                <div class="github-sync-status">
+                  <div class="sync-status-indicator">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>Sign in with GitHub to enable haiku syncing • Available in the navbar</span>
+                  </div>
+                </div>
+              {/if}
+            </div>
           </div>
         </div>
-      </div>
-      
-      <!-- Text-to-Speech Settings -->
-      <div class="setting-group">
-        <h3 class="setting-label">Text-to-Speech</h3>
-        
-        <div class="setting-item">
-          <label class="api-key-label">
-            <span class="api-key-title">ElevenLabs API Key</span>
-            <div class="setting-description">Required for text-to-speech functionality. Your key is stored locally and never sent to our servers.</div>
-            <div class="api-key-input-container">
+      {/if}
+
+      <!-- Auth Tab -->
+      {#if activeTab === 'auth'}
+        <div class="setting-group">
+          <h3 class="setting-label">Authentication & API Keys</h3>
+          
+          <div class="setting-item">
+            <div class="github-auth-section">
+              <div class="github-auth-header">
+                <span class="github-auth-title">GitHub Authentication</span>
+                <div class="setting-description">
+                  Sign in with GitHub to enable AI-powered haiku analysis using GitHub Models. 
+                  Each user gets their own free quota.
+                </div>
+              </div>
+              
+              {#if $authStore.isAuthenticated && $authStore.user}
+                <!-- Authenticated state -->
+                <div class="github-user-card">
+                  <div class="github-user-info">
+                    <img 
+                      src={/** @type {any} */($authStore.user)?.avatar_url} 
+                      alt={/** @type {any} */($authStore.user)?.name || /** @type {any} */($authStore.user)?.login}
+                      class="github-avatar"
+                    />
+                    <div class="github-user-details">
+                      <div class="github-user-name">
+                        {/** @type {any} */($authStore.user)?.name || /** @type {any} */($authStore.user)?.login}
+                      </div>
+                      <div class="github-user-login">@{/** @type {any} */($authStore.user)?.login}</div>
+                    </div>
+                  </div>
+                  <button 
+                    type="button"
+                    class="github-signout-button"
+                    on:click={handleGitHubSignOut}
+                    aria-label="Sign out of GitHub"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+                
+                <div class="github-status-indicator success">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                  </svg>
+                  <span>Connected • AI analysis enabled • Using your GitHub Models quota</span>
+                </div>
+              {:else}
+                <!-- Unauthenticated state with rationale -->
+                <div class="github-signin-rationale">
+                  <div class="rationale-content">
+                    <h4 class="rationale-title">🤖 Enable AI Analysis</h4>
+                    <p class="rationale-description">
+                      Sign in with GitHub to unlock AI-powered haiku analysis! Get instant feedback with:
+                    </p>
+                    <ul class="rationale-features">
+                      <li>⭐ Star ratings (1-5 stars)</li>
+                      <li>💭 Thoughtful AI commentary</li>
+                      <li>🏷️ Smart task categorization</li>
+                      <li>🎯 Personal quota usage</li>
+                    </ul>
+                    <p class="rationale-note">
+                      Uses <strong>GitHub Models</strong> - each user gets their own free quota. 
+                      No API keys needed, just sign in!
+                    </p>
+                  </div>
+                  
+                  <div class="github-signin-container">
+                    <button 
+                      type="button"
+                      class="github-signin-button"
+                      on:click={handleGitHubSignIn}
+                      disabled={$authStore.isLoading}
+                    >
+                      {#if $authStore.isLoading}
+                        <div class="github-signin-spinner"></div>
+                        <span>Connecting...</span>
+                      {:else}
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 0C5.374 0 0 5.373 0 12 0 17.302 3.438 21.8 8.207 23.387c.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                        <span>Sign in with GitHub</span>
+                      {/if}
+                    </button>
+                    
+                    {#if $authStore.error}
+                      <div class="github-error-message">
+                        {$authStore.error}
+                      </div>
+                    {/if}
+                  </div>
+                </div>
+                
+                <div class="github-status-indicator">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  <span>Sign in required for AI analysis • Available in navbar for convenience</span>
+                </div>
+              {/if}
+            </div>
+          </div>
+          
+          <div class="setting-item">
+            <div class="api-key-label">
+              <span class="api-key-title">ElevenLabs API Key</span>
+              <div class="setting-description">Required for text-to-speech functionality. Your key is stored locally and never sent to our servers.</div>
+              <div class="api-key-input-container">
                 <input 
                   type={showApiKey ? 'text' : 'password'}
                   class="api-key-input"
                   bind:value={settings.elevenlabsApiKey}
-                  on:input={() => settings.preset = 'custom'}
                   placeholder="sk-..."
                   autocomplete="off"
                   spellcheck="false"
@@ -371,37 +603,10 @@
                   {/if}
                 </button>
               </div>
-          </label>
-        </div>
-        
-        <div class="setting-item">
-          <label class="range-label">
-            <span class="range-title">Pause Between Lines</span>
-            <div class="setting-description">Duration of pause between haiku lines during text-to-speech</div>
-            <div class="range-input-container">
-                <input 
-                  type="range"
-                  class="range-input"
-                  bind:value={settings.ttsPauseDuration}
-                  on:input={() => settings.preset = 'custom'}
-                  min="0.1"
-                  max="3.0"
-                  step="0.1"
-                />
-              <div class="range-value">
-                {settings.ttsPauseDuration}s
-              </div>
             </div>
-            <div class="range-marks">
-                <span>0.1s</span>
-                <span>1.5s</span>
-                <span>3.0s</span>
-            </div>
-          </label>
+          </div>
         </div>
-      </div>
-
-  <!-- Removed non-functional toggles: gentle error pulse, line guide on focus, soft success pulse, hide header, indicator mode, ephemeral hints -->
+      {/if}
     </div>
   </div>
 {/if}
@@ -475,15 +680,48 @@
   .settings-content-wrapper {
     flex: 1;
     overflow-y: auto;
-    padding: 24px;
+    padding: 0;
     box-sizing: border-box;
     background: var(--bg-primary);
     color: var(--text-primary);
+  }
+
+  /* Tab Navigation */
+  .tab-navigation {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    overflow-x: auto;
+  }
+
+  .tab-button {
+    padding: 16px 24px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .tab-button:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+  }
+
+  .tab-button.active {
+    color: var(--border-focus);
+    border-bottom-color: var(--border-focus);
+    background: var(--bg-primary);
   }
   
   .settings-content {
     max-width: none;
     width: 100%;
+    padding: 24px;
     padding-bottom: 16px;
   }
   
@@ -501,6 +739,13 @@
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 16px;
+  }
+
+  .setting-item-label {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    display: block;
   }
   
   .poem-type-trigger {
@@ -625,6 +870,11 @@
     min-height: 48px;
     width: 100%;
   }
+
+  .toggle-label.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
   
   .toggle-input {
     display: none;
@@ -661,6 +911,15 @@
   .toggle-input:checked + .toggle-slider::before {
     transform: translateX(20px);
   }
+
+  .toggle-input:disabled + .toggle-slider {
+    background: var(--bg-tertiary);
+    opacity: 0.6;
+  }
+
+  .toggle-input:disabled:checked + .toggle-slider {
+    background: color-mix(in srgb, var(--border-focus) 60%, var(--bg-tertiary));
+  }
   
   .toggle-text {
     flex: 1;
@@ -683,67 +942,11 @@
     margin-top: 4px;
     line-height: 1.4;
   }
-  
-  /* Radio group styles */
-  /* unused: .setting-label-inline */
-  
-  .radio-group {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 8px;
-  }
-  
-  .radio-option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  
-  .radio-input {
-    display: none;
-  }
-  
-  .radio-custom {
-    width: 16px;
-    height: 16px;
-    border: 2px solid var(--border-color);
-    border-radius: 50%;
-    position: relative;
-    transition: all 0.2s;
-  }
-  
-  .radio-custom::before {
-    content: '';
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--border-focus);
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0);
-    transition: transform 0.2s;
-  }
-  
-  .radio-input:checked + .radio-custom {
-    border-color: var(--border-focus);
-  }
-  
-  .radio-input:checked + .radio-custom::before {
-    transform: translate(-50%, -50%) scale(1);
-  }
-  
-  .radio-text {
-    font-size: 0.875rem;
-    color: var(--text-primary);
+
+  .requirement-hint {
+    color: var(--border-focus);
     font-weight: 500;
   }
-
-  /* Improve spacing for dense items */
-  .setting-item .toggle-text { padding-top: 2px; }
-  .setting-item .toggle-title { margin-bottom: 2px; }
   
   .settings-footer {
     display: flex;
@@ -874,6 +1077,7 @@
     border-radius: 3px;
     outline: none;
     -webkit-appearance: none;
+    appearance: none;
     transition: all 0.2s;
   }
   
@@ -926,20 +1130,7 @@
     font-size: 0.75rem;
     color: var(--text-secondary);
   }
-  
-  /* Inline panel styles */
-  /* unused: .settings-panel-content ... */
-  
-  /* unused */
-  
-  /* unused */
-  
-  /* unused */
-  
-  /* unused */
-  
-  /* unused: .hidden */
-  
+
   /* GitHub OAuth UI Styles */
   .github-auth-section {
     width: 100%;
@@ -1133,5 +1324,132 @@
   
   .rationale-note strong {
     color: var(--text-secondary, #6b7280);
+  }
+
+  /* GitHub Sync Section Styles */
+  .github-sync-section {
+    width: 100%;
+  }
+
+  .github-sync-header {
+    margin-bottom: 16px;
+  }
+
+  .github-sync-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
+  }
+
+  .github-sync-status {
+    background: var(--bg-secondary, #f8fafc);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .sync-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--text-secondary, #6b7280);
+  }
+
+  .sync-status-indicator.success {
+    color: #166534;
+  }
+
+  .sync-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .sync-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--border-focus, #3b82f6);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .sync-button:hover:not(:disabled) {
+    background: var(--border-focus-dark, #2563eb);
+    transform: translateY(-1px);
+  }
+
+  .sync-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .sync-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .sync-info {
+    font-size: 12px;
+    color: var(--text-secondary, #6b7280);
+  }
+
+  .local-storage-info {
+    background: var(--bg-tertiary, #f1f5f9);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .storage-info-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
+    margin-bottom: 8px;
+  }
+
+  .storage-info-text {
+    font-size: 13px;
+    color: var(--text-secondary, #6b7280);
+    line-height: 1.4;
+    margin-bottom: 12px;
+  }
+
+  .storage-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-tertiary, #9ca3af);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
   }
 </style>

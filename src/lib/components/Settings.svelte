@@ -20,8 +20,7 @@
     ttsPauseDuration: 1.0,
     enableTaskTracking: false,
     enableTTS: false,
-    enableCritique: false,
-    autoSubmit: false
+    enableCritique: false
   };
 
   let activeTab = 'editor';
@@ -259,16 +258,6 @@
             </label>
           </div>
           
-          <div class="setting-item">
-            <label class="toggle-label">
-              <input type="checkbox" bind:checked={settings.autoSubmit} class="toggle-input" />
-              <span class="toggle-slider"></span>
-              <span class="toggle-text">
-                <span class="toggle-title">Auto submit on valid</span>
-                <div class="setting-description">Automatically submits poems for analysis when syllable pattern is complete</div>
-              </span>
-            </label>
-          </div>
         </div>
       {/if}
 

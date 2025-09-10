@@ -10,8 +10,7 @@ export const defaultSettings = {
   ttsPauseDuration: 1.0, // Pause duration between lines in seconds (default 1 second)
   enableTaskTracking: false, // Enable task tracking for haikus (todo/in_progress/done)
   enableTTS: false, // Enable text-to-speech functionality
-  enableCritique: false, // Enable AI analysis and critique
-  autoSubmit: false // Auto-submit when poem is complete
+  enableCritique: false // Enable AI analysis and critique
 };
 
 

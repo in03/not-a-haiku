@@ -3,15 +3,15 @@
  */
 
 // OAuth configuration from environment variables
-export const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
-export const REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI;
+export const GITHUB_CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID;
+export const REDIRECT_URI = import.meta.env.VITE_OAUTH_REDIRECT_URI;
 
 // Validate required environment variables
 if (!GITHUB_CLIENT_ID) {
-  console.warn('⚠️  VITE_GITHUB_CLIENT_ID not set - GitHub OAuth will not work');
+  console.warn('⚠️  VITE_OAUTH_CLIENT_ID not set - GitHub OAuth will not work');
 }
 if (!REDIRECT_URI) {
-  console.warn('⚠️  VITE_GITHUB_REDIRECT_URI not set - GitHub OAuth will not work');
+  console.warn('⚠️  VITE_OAUTH_REDIRECT_URI not set - GitHub OAuth will not work');
 }
 
 /**
@@ -21,10 +21,10 @@ if (!REDIRECT_URI) {
  */
 export function getGitHubAuthUrl(state) {
   if (!GITHUB_CLIENT_ID) {
-    throw new Error('VITE_GITHUB_CLIENT_ID is not set');
+    throw new Error('VITE_OAUTH_CLIENT_ID is not set');
   }
   if (!REDIRECT_URI) {
-    throw new Error('VITE_GITHUB_REDIRECT_URI is not set');
+    throw new Error('VITE_OAUTH_REDIRECT_URI is not set');
   }
   
   const params = new URLSearchParams({

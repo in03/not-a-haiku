@@ -36,6 +36,9 @@ jobs:
       run: pnpm build
       env:
         NODE_ENV: production
+        OAUTH_CLIENT_SECRET: ${{ secrets.OAUTH_CLIENT_SECRET }}
+        VITE_OAUTH_CLIENT_ID: ${{ secrets.VITE_OAUTH_CLIENT_ID }}
+        VITE_OAUTH_REDIRECT_URI: ${{ secrets.VITE_OAUTH_REDIRECT_URI }}
     
     - name: Upload build artifacts
       uses: actions/upload-pages-artifact@v3

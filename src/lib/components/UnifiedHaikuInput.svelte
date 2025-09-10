@@ -99,6 +99,30 @@
     }
   }
   
+  // Handle title click to edit
+  function handleTitleClick() {
+    step = 'title';
+    isExpanded = false;
+    
+    // Focus the title input after shrinking
+    setTimeout(() => {
+      const titleInput = document.querySelector('.title-input');
+      if (titleInput) {
+        // @ts-ignore - focus method exists on input elements
+        titleInput.focus();
+      }
+    }, 0);
+  }
+  
+  // Handle title keyboard interaction
+  /** @param {KeyboardEvent} event */
+  function handleTitleKeydown(event) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleTitleClick();
+    }
+  }
+  
   // Update debounced validation for UI elements (300ms delay)
   /** @param {{ isValid: boolean, isComplete: boolean, feedback: string }} newValidation */
   function updateDebouncedValidation(newValidation) {
@@ -711,6 +735,26 @@
     ];
     
     if (allowedKeys.includes(event.key)) {
+      // Handle backspace to shrink back to title input
+      if (event.key === 'Backspace') {
+        // If content is empty or cursor is at the beginning, shrink back to title
+        if (content.trim() === '' || cursorPos === 0) {
+          event.preventDefault();
+          step = 'title';
+          isExpanded = false;
+          
+          // Focus the title input after shrinking
+          setTimeout(() => {
+            const titleInput = document.querySelector('.title-input');
+            if (titleInput) {
+              // @ts-ignore - focus method exists on input elements
+              titleInput.focus();
+            }
+          }, 0);
+          return;
+        }
+      }
+      
       // Dispatch cursor position for navigation keys
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
         setTimeout(() => dispatchCursorPosition(), 0);
@@ -886,7 +930,14 @@
 >
   <!-- Title when expanded (shrunk and positioned top-left) -->
   {#if step === 'content' && title}
-    <div class="title-shrunk">
+    <div 
+      class="title-shrunk" 
+      role="button"
+      tabindex="0"
+      on:click={handleTitleClick}
+      on:keydown={handleTitleKeydown}
+      aria-label="Edit title"
+    >
       {title}
     </div>
   {/if}
@@ -1013,6 +1064,14 @@
     opacity: 0;
     transform: translateY(10px);
     animation: slideInTitle 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+  }
+  
+  .title-shrunk:hover {
+    background-color: rgba(0, 0, 0, 0.05);
   }
   
   @keyframes slideInTitle {
@@ -1359,6 +1418,10 @@
     
     .title-shrunk {
       color: var(--text-primary, #f9fafb);
+    }
+    
+    .title-shrunk:hover {
+      background-color: rgba(255, 255, 255, 0.1);
     }
     
     .tts-button {

@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher, onMount, tick } from 'svelte';
-  import { validateHaiku, countHaikuSyllables, initializeSyllableCounter } from '../onnx-syllable-counter.js';
+  import { validateHaiku, countHaikuSyllables } from '../onnx-syllable-counter.js';
   import { settingsStore, defaultSettings } from '$lib/stores/settings.js';
   import { poemTypes } from '../poemTypes.js';
   import { convertTextToSpeechWithTiming, playAudioWithWordTiming, streamTextToSpeechWithTiming, simpleTextToSpeechWithTiming, isValidApiKey } from '../elevenlabs-tts.js';
@@ -104,6 +104,14 @@
   
   // Handle TTS toggle
   async function handleTTSToggle() {
+    if (!settings.enableTTS) {
+      dispatch('toast', {
+        message: 'Text-to-speech is disabled in Settings.',
+        type: 'warning'
+      });
+      return;
+    }
+    
     if (!isValidApiKey(settings.elevenlabsApiKey)) {
       dispatch('toast', {
         message: 'Add your ElevenLabs API key in Settings to enable text-to-speech.',
@@ -124,7 +132,7 @@
   // Start text-to-speech
   async function startTTS() {
     console.log('TTS start');
-    if (!content.trim() || !isValidApiKey(settings.elevenlabsApiKey)) return;
+    if (!content.trim() || !settings.enableTTS || !isValidApiKey(settings.elevenlabsApiKey)) return;
     
     try {
       cancelScheduledClearHighlighting();
@@ -458,6 +466,13 @@
     if (content !== undefined && step === 'content') {
       updateSyllableCounts(content).catch(error => {
         console.error('Syllable counting error:', error);
+        // Dispatch error to parent component
+        dispatch('toast', {
+          message: 'Syllable counting failed. Please refresh the page.',
+          type: 'error'
+        });
+        // Also throw the error to trigger global error handler
+        throw error;
       });
     }
   }
@@ -806,13 +821,7 @@
     });
   }
   
-  onMount(async () => {
-    try {
-      await initializeSyllableCounter();
-    } catch (error) {
-      console.error('Failed to initialize syllable counter:', error);
-    }
-  });
+  // Note: Syllable counter initialization is handled by the parent component
   
   // Cleanup
   import { onDestroy } from 'svelte';
@@ -836,8 +845,8 @@
     </div>
   {/if}
   
-  <!-- TTS Speaker Icon (top-right when content exists) -->
-  {#if step === 'content' && content.trim()}
+  <!-- TTS Speaker Icon (top-right when content exists and TTS is enabled) -->
+  {#if step === 'content' && content.trim() && settings.enableTTS}
     <button 
       class="tts-button"
       class:playing={isPlaying}

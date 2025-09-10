@@ -17,6 +17,7 @@ import { base } from '$app/paths';
 // Model session cache
 let modelSession = null;
 let isModelLoaded = false;
+let isModelLoading = false;
 
 // Verbose logging that respects Chrome dev tools log level
 function verboseLog(...args) {
@@ -29,19 +30,33 @@ function verboseLog(...args) {
  */
 async function initializeModel() {
   if (isModelLoaded) return;
+  if (isModelLoading) {
+    // Wait for the current loading to complete
+    while (isModelLoading && !isModelLoaded) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return;
+  }
+  
+  isModelLoading = true;
   
   try {
     // Load the ONNX model from static directory
     // Handle base path for GitHub Pages deployment
     const modelPath = `${base}/syllable_model.onnx`;
+    console.log('Loading ONNX model from:', modelPath);
+    
     modelSession = await ort.InferenceSession.create(modelPath);
     isModelLoaded = true;
     console.log('ONNX syllable model loaded successfully');
-    
 
   } catch (error) {
     console.error('Failed to load ONNX model:', error);
+    console.error('Model path attempted:', `${base}/syllable_model.onnx`);
+    console.error('Base path:', base);
     throw new Error('ML model initialization failed');
+  } finally {
+    isModelLoading = false;
   }
 }
 
@@ -127,36 +142,11 @@ async function mlSyllableCount(word) {
     
   } catch (error) {
     console.error('ML inference failed:', error);
-    // Fallback to basic vowel counting if ML fails
-    return basicVowelCount(word);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`ML syllable counting failed for word "${word}": ${errorMessage}`);
   }
 }
 
-/**
- * Basic vowel counting as ultimate fallback
- */
-function basicVowelCount(word) {
-  if (!word || word.length === 0) return 0;
-  
-  const cleanWord = word.toLowerCase().replace(/[^a-z]/g, '');
-  if (cleanWord.length === 0) return 0;
-  
-  let syllables = 0;
-  let previousWasVowel = false;
-  
-  for (let i = 0; i < cleanWord.length; i++) {
-    const char = cleanWord[i];
-    const isVowel = 'aeiouy'.includes(char);
-    
-    if (isVowel && !previousWasVowel) {
-      syllables++;
-    }
-    
-    previousWasVowel = isVowel;
-  }
-  
-  return Math.max(1, syllables);
-}
 
 /**
  * Extract words with completion status from text

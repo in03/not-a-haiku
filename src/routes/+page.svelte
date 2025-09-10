@@ -5,13 +5,37 @@
   import UnifiedHaikuInput from '$lib/components/UnifiedHaikuInput.svelte';
   import AnalysisResults from '$lib/components/AnalysisResults.svelte';
   import Toast from '$lib/components/Toast.svelte';
+  import ModelErrorModal from '$lib/components/ModelErrorModal.svelte';
   import { settingsStore } from '$lib/stores/settings.js';
   import { authStore } from '$lib/stores/auth.js';
   import { haikuStore } from '$lib/stores/haiku-db.js';
   import { poemTypes } from '$lib/poemTypes.js';
   import { analyzeHaiku } from '$lib/github-models.js';
+  import { initializeSyllableCounter } from '$lib/onnx-syllable-counter.js';
   import confetti from 'canvas-confetti';
   import { onMount } from 'svelte';
+  
+  // Initialize syllable counter on mount
+  onMount(async () => {
+    try {
+      const success = await initializeSyllableCounter();
+      if (!success) {
+        modelError = new Error('Failed to initialize syllable counter');
+        showModelError = true;
+      }
+    } catch (error) {
+      modelError = error instanceof Error ? error : new Error(String(error));
+      showModelError = true;
+    }
+    
+    // Global error handler for ML errors
+    window.addEventListener('error', (event) => {
+      if (event.error && event.error.message && event.error.message.includes('ML syllable counting failed')) {
+        modelError = event.error;
+        showModelError = true;
+      }
+    });
+  });
   
   let title = '';
   let content = '';
@@ -24,6 +48,11 @@
   let toastMessage = '';
   let toastType = 'info';
   let celebrationIndex = 0;
+  
+  // Model error state
+  let showModelError = false;
+  /** @type {Error | null} */
+  let modelError = null;
   /** @type {any} */
   let unifiedInputComponent;
   /** @type {HTMLDivElement | null} */
@@ -212,8 +241,8 @@
         });
       }
       
-      // Try to analyze the haiku if user is authenticated
-      if ($authStore.isAuthenticated && $authStore.accessToken) {
+      // Try to analyze the haiku if user is authenticated and critique is enabled
+      if ($authStore.isAuthenticated && $authStore.accessToken && $settingsStore.enableCritique) {
         try {
           isAnalyzing = true;
           showToast = true;
@@ -474,6 +503,12 @@
   message={toastMessage}
   type={toastType}
   on:close={() => showToast = false}
+/>
+
+<!-- Model Error Modal -->
+<ModelErrorModal
+  bind:isOpen={showModelError}
+  error={modelError}
 />
 
 <style>

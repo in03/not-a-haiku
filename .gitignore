@@ -85,7 +85,7 @@ kit-output/
 *.svelte-kit
 
 # SvelteKit lock files
-pnpm-lock.yaml
+# pnpm-lock.yaml - Keep this for reproducible builds
 yarn.lock
 package-lock.json
 

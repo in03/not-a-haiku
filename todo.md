@@ -38,14 +38,14 @@
   - [ ] Support both default voices and bring-your-own (BYO) options
 
 ### Syllable Detection
-- [ ] **ONNX model fixes**:
+- [x] **ONNX model fixes**:
   - [x] Resolve GitHub deployment issues causing bad word detection
-  - [ ] Fix specific word detection errors:
-    - [ ] "One" incorrectly detected as two syllables
-    - [ ] "Clothes" consistently detected as two syllables
-- [ ] **Smart validation**:
+  - [x] Fix specific word detection errors:
+    - [x] "One" incorrectly detected as two syllables
+    - [x] "Clothes" consistently detected as two syllables
+- [] **Smart validation**:
   - [ ] Prevent over-limit blocking on incomplete last words
-  - [ ] Handle partial word input gracefully (e.g., "CL" → "CLO")
+  - [x] Handle partial word input gracefully (e.g., "CL" → "CLO")
 
 ## 🎨 UI/UX Polish
 
@@ -59,11 +59,14 @@
   - [ ] Resolve transparency and styling issues
   - [ ] Fix blue outlines and spacing problems
   - [ ] Correct settings pane corner radius inconsistencies
-  - [ ] Tails of some lettersS are cut off on the lowest line.
+  - [x] Descenders of some letters are cut off on the lowest line.
 - [x] **Settings toggles** - Fix non-functional AI analysis and TTS toggles (ensure business logic)
 
 ### TTS
 - [ ] Highlighting is pretty broken. Might consider removing and having play/pause only.
+
+### Mobile
+- [ ] Autocomplete seems to cause counting and validation issues.
 
 ## 🔄 System Integration
 

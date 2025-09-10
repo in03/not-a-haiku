@@ -72,15 +72,18 @@
     }
   }
   
-  // When auto-backspace is disabled, lock input (except navigation/deletion) while over the limit
-  $: isLockedOverLimit = !settings.autoBackspace && syllableCounts.some((count, index) => count > expectedSyllables[index]);
-  $: isInputBlocked = isTemporarilyBlocked || isLockedOverLimit;
+  // Track if we're over limit for word boundary blocking (not immediate blocking)
+  $: isOverLimit = syllableCounts.some((count, index) => count > expectedSyllables[index]);
+  $: isInputBlocked = isTemporarilyBlocked;
   
   // Calculate dynamic height based on poem type
   $: titleHeight = 60; // Height for title input
-  $: lineHeight = 32; // Approximate height per line
+  $: lineHeight = 32.4; // Actual line height: 1.8 * 18px = 32.4px
   $: padding = 24; // Container padding
   $: expandedHeight = titleHeight + (expectedLines * lineHeight) + padding + 40; // Extra space for title when shrunk
+  
+  // Precalculated textarea height based on poem type
+  $: textareaHeight = expectedLines * lineHeight;
   
   // Handle title submission
   async function handleTitleSubmit() {
@@ -680,6 +683,24 @@
       }
     }
     
+    // Handle word boundary blocking when auto-backspace is disabled
+    if (!settings.autoBackspace && isOverLimit && event.key === ' ') {
+      // User is trying to complete a word while over the limit
+      event.preventDefault();
+      
+      if (settings.enableShake) {
+        shakeWindow();
+      }
+      
+      // Show visual feedback that input is blocked
+      isTemporarilyBlocked = true;
+      setTimeout(() => {
+        isTemporarilyBlocked = false;
+      }, 1000);
+      
+      return;
+    }
+    
     const cursorPos = textareaElement.selectionStart;
     
     // Allow special keys (including navigation)
@@ -738,6 +759,12 @@
     
     // Handle SPACE - trigger word submission validation
     if (event.key === ' ') {
+      // Check if we're over limit and auto-backspace is disabled
+      if (!settings.autoBackspace && currentSyll > expectedSyll) {
+        // Block the space - this is handled by the word boundary blocking above
+        return;
+      }
+      
       // Allow the space to be typed first
       setTimeout(() => {
         // Trigger validation after the space is added
@@ -819,13 +846,6 @@
     });
   }
   
-  // Auto-resize textarea based on content
-  function autoResize() {
-    if (textareaElement) {
-      textareaElement.style.height = 'auto';
-      textareaElement.style.height = Math.max(expectedLines * lineHeight, textareaElement.scrollHeight) + 'px';
-    }
-  }
   
   // Reset function
   export function reset() {
@@ -930,8 +950,6 @@
         <textarea
           bind:this={textareaElement}
           bind:value={content}
-          on:input={autoResize}
-          on:focus={() => autoResize()}
           on:keydown={handleKeydown}
           on:paste={handlePaste}
           on:click={dispatchCursorPosition}
@@ -945,6 +963,7 @@
           data-1p-ignore
           data-lpignore="true"
           data-form-type="other"
+          style="height: {textareaHeight}px;"
         ></textarea>
       </div>
       
@@ -1047,8 +1066,6 @@
   }
   
   .content-textarea {
-    min-height: calc(var(--expected-lines) * 32px);
-    max-height: calc(var(--expected-lines) * 32px);
     overflow: hidden; /* No scrollbars */
   }
   
@@ -1317,6 +1334,7 @@
     width: 100% !important;
     height: 100% !important;
     padding: var(--content-padding-block, 8px) var(--content-padding-inline, 16px) !important;
+    padding-bottom: calc(var(--content-padding-block, 8px) + 6px) !important; /* Extra space for descenders */
     margin: 0 !important;
     border: none !important;
     outline: none !important;

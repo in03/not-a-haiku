@@ -63,7 +63,8 @@
 - [x] **Settings toggles** - Fix non-functional AI analysis and TTS toggles (ensure business logic)
 
 ### TTS
-- [ ] Highlighting is pretty broken. Might consider removing and having play/pause only.
+- [x] Highlighting is pretty broken. Might consider removing and having play/pause only.
+- [ ] Overlapping playback on multiple presses. Don't know why this is so hard to fix.
 
 ### Mobile
 - [ ] Autocomplete seems to cause counting and validation issues.

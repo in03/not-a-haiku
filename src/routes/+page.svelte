@@ -76,6 +76,12 @@
   
   // Function to start a new haiku
   function startNewHaiku() {
+    // Clear any pending validation timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+      validationTimeout = null;
+    }
+    
     if (unifiedInputComponent) {
       unifiedInputComponent.reset();
     }
@@ -83,6 +89,7 @@
     content = '';
     syllableCounts = [];
     validation = { isValid: false, isComplete: false, feedback: '' };
+    debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
     analysis = null;
     showAnalysis = false;
     currentHaikuId = null;
@@ -108,7 +115,7 @@
     {
       id: 'wifi-woes',
       title: '📶 wifi woes',
-      content: 'Password incorrect\nBut I typed it perfectly\nRouter, you\'re a liar'
+      content: 'Password incorrect\nBut I typed it perfectly\nRouter why you suck'
     },
     {
       id: 'monday-blues',
@@ -208,16 +215,21 @@
       clearTimeout(validationTimeout);
     }
     
-    // Debounce validation updates for UI (300ms delay)
-    validationTimeout = setTimeout(() => {
-      const previousDebouncedValid = debouncedValidation.isValid;
+    // If validation becomes invalid, immediately update debounced state
+    if (!validation.isValid) {
       debouncedValidation = { ...validation };
-      
-      // Cycle celebration message when haiku becomes valid
-      if (!previousDebouncedValid && debouncedValidation.isValid) {
-        celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
-      }
-    }, 300);
+    } else {
+      // If validation becomes valid, debounce the update (300ms delay)
+      validationTimeout = setTimeout(() => {
+        const previousDebouncedValid = debouncedValidation.isValid;
+        debouncedValidation = { ...validation };
+        
+        // Cycle celebration message when haiku becomes valid
+        if (!previousDebouncedValid && debouncedValidation.isValid) {
+          celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
+        }
+      }, 300);
+    }
     
     // Update progress bar target immediately for smooth animation
     updateProgressBarTarget();
@@ -363,6 +375,12 @@
       // Don't auto-reset if analysis is shown - let user manually start new haiku
       if (!showAnalysis) {
         setTimeout(() => {
+          // Clear any pending validation timeout
+          if (validationTimeout) {
+            clearTimeout(validationTimeout);
+            validationTimeout = null;
+          }
+          
           if (unifiedInputComponent) {
             unifiedInputComponent.reset();
           }
@@ -370,6 +388,7 @@
           content = '';
           syllableCounts = [];
           validation = { isValid: false, isComplete: false, feedback: '' };
+          debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
           celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
         }, 3000);
       }

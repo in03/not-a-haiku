@@ -12,10 +12,14 @@
 import * as ort from 'onnxruntime-web';
 import cmuDict from './data/cmu-syllables.json';
 import modelMetadata from '../ml/model_metadata.json';
+import { base } from '$app/paths';
 
 // Model session cache
 let modelSession = null;
 let isModelLoaded = false;
+let isModelLoading = false;
+
+// Simple dictionary lookup is fast enough - no caching needed
 
 // Verbose logging that respects Chrome dev tools log level
 function verboseLog(...args) {
@@ -28,20 +32,36 @@ function verboseLog(...args) {
  */
 async function initializeModel() {
   if (isModelLoaded) return;
+  if (isModelLoading) {
+    // Wait for the current loading to complete
+    while (isModelLoading && !isModelLoaded) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return;
+  }
+  
+  isModelLoading = true;
   
   try {
     // Load the ONNX model from static directory
-    const modelPath = '/syllable_model.onnx';
+    // Handle base path for GitHub Pages deployment
+    const modelPath = `${base}/syllable_model.onnx`;
+    console.log('Loading ONNX model from:', modelPath);
+    
     modelSession = await ort.InferenceSession.create(modelPath);
     isModelLoaded = true;
     console.log('ONNX syllable model loaded successfully');
-    
 
   } catch (error) {
     console.error('Failed to load ONNX model:', error);
+    console.error('Model path attempted:', `${base}/syllable_model.onnx`);
+    console.error('Base path:', base);
     throw new Error('ML model initialization failed');
+  } finally {
+    isModelLoading = false;
   }
 }
+
 
 /**
  * Preprocess word for ONNX model input
@@ -125,36 +145,11 @@ async function mlSyllableCount(word) {
     
   } catch (error) {
     console.error('ML inference failed:', error);
-    // Fallback to basic vowel counting if ML fails
-    return basicVowelCount(word);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`ML syllable counting failed for word "${word}": ${errorMessage}`);
   }
 }
 
-/**
- * Basic vowel counting as ultimate fallback
- */
-function basicVowelCount(word) {
-  if (!word || word.length === 0) return 0;
-  
-  const cleanWord = word.toLowerCase().replace(/[^a-z]/g, '');
-  if (cleanWord.length === 0) return 0;
-  
-  let syllables = 0;
-  let previousWasVowel = false;
-  
-  for (let i = 0; i < cleanWord.length; i++) {
-    const char = cleanWord[i];
-    const isVowel = 'aeiouy'.includes(char);
-    
-    if (isVowel && !previousWasVowel) {
-      syllables++;
-    }
-    
-    previousWasVowel = isVowel;
-  }
-  
-  return Math.max(1, syllables);
-}
 
 /**
  * Extract words with completion status from text
@@ -169,7 +164,8 @@ function extractWordsWithBoundaries(text) {
   if (words.length === 0) return [];
   
   // Determine if text ends with complete word (space/punctuation after)
-  const textEndsComplete = /[\s\p{P}]$/.test(text);
+  // Also consider a word complete if it's followed by a newline (even without space)
+  const textEndsComplete = /[\s\p{P}\n]$/.test(text);
   
   if (textEndsComplete) {
     // All words are complete
@@ -192,33 +188,27 @@ async function countWordSyllables(word, isComplete) {
   
   const startTime = performance.now();
   
-  if (isComplete) {
-    // Special rule: Single letters are treated as words (1 syllable) when complete
-    // This addresses the acronym vs word ambiguity mentioned in syllable-quirks.md
-    if (cleanWord.length === 1) {
-      verboseLog(`Single letter rule: "${cleanWord}" = 1 syllable (complete word)`);
-      return 1;
-    }
-    
-    // Complete word: Use dictionary first, ML fallback
-    const dictResult = cmuDict[cleanWord];
-    if (dictResult !== undefined) {
-      const dictTime = performance.now() - startTime;
-      verboseLog(`Dict lookup: "${cleanWord}" = ${dictResult} syllables (${dictTime.toFixed(2)}ms)`);
-      return dictResult;
-    }
-    // Unknown complete word: use ML fallback
-    const mlResult = await mlSyllableCount(cleanWord);
-    const mlTime = performance.now() - startTime;
-    verboseLog(`ML inference: "${cleanWord}" = ${mlResult} syllables (${mlTime.toFixed(2)}ms)`);
-    return mlResult;
-  } else {
-    // Partial word: Always use ML for real-time feedback
-    const mlResult = await mlSyllableCount(cleanWord);
-    const mlTime = performance.now() - startTime;
-    verboseLog(`ML inference (partial): "${cleanWord}" = ${mlResult} syllables (${mlTime.toFixed(2)}ms)`);
-    return mlResult;
+  // Special rule: Single letters are treated as words (1 syllable) when complete
+  // This addresses the acronym vs word ambiguity mentioned in syllable-quirks.md
+  if (cleanWord.length === 1 && isComplete) {
+    verboseLog(`Single letter rule: "${cleanWord}" = 1 syllable (complete word)`);
+    return 1;
   }
+  
+  // ALWAYS check dictionary first, regardless of completion status
+  const dictResult = cmuDict[cleanWord];
+  if (dictResult !== undefined) {
+    const dictTime = performance.now() - startTime;
+    verboseLog(`Dict lookup: "${cleanWord}" = ${dictResult} syllables (${dictTime.toFixed(2)}ms)`);
+    return dictResult;
+  }
+  
+  // If not in dictionary, use ML
+  const mlResult = await mlSyllableCount(cleanWord);
+  const mlTime = performance.now() - startTime;
+  verboseLog(`ML inference${isComplete ? '' : ' (partial)'}: "${cleanWord}" = ${mlResult} syllables (${mlTime.toFixed(2)}ms)`);
+  
+  return mlResult;
 }
 
 /**
@@ -321,6 +311,7 @@ export async function validateHaiku(content, expectedSyllables = [5, 7, 5], poem
     feedback
   };
 }
+
 
 /**
  * Initialize the model on module load

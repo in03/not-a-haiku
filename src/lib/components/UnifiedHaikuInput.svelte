@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher, onMount, tick } from 'svelte';
-  import { validateHaiku, countHaikuSyllables, initializeSyllableCounter } from '../onnx-syllable-counter.js';
+  import { validateHaiku, countHaikuSyllables } from '../onnx-syllable-counter.js';
   import { settingsStore, defaultSettings } from '$lib/stores/settings.js';
   import { poemTypes } from '../poemTypes.js';
   import { convertTextToSpeechWithTiming, playAudioWithWordTiming, streamTextToSpeechWithTiming, simpleTextToSpeechWithTiming, isValidApiKey } from '../elevenlabs-tts.js';
@@ -13,6 +13,11 @@
   
   // Track validation state for submit button
   let validation = { isValid: false, isComplete: false, feedback: '' };
+  
+  // Debounced validation state for UI elements (300ms delay)
+  let debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let validationTimeout = null;
   
   /** @type {typeof defaultSettings} */
   let settings = defaultSettings;
@@ -39,9 +44,10 @@
   let highlightedWordIndex = -1;
   /** @type {Array<{word: string, index: number, isHighlighted: boolean, isNonWord?: boolean, isSpace?: boolean, x?: number, y?: number, width?: number, height?: number, lineIndex?: number}>} */
   let currentWords = []; // Store parsed words for highlighting
-  /** @type {HTMLCanvasElement | null} */
-  let highlightCanvas; // Reference to canvas element
-  /** @type {HTMLAudioElement | null} */
+  // NOTE: Canvas highlighting was disabled due to being broken
+  // /** @type {HTMLCanvasElement | null} */
+  // let highlightCanvas; // Reference to canvas element
+  /** @type {HTMLAudioElement | { cancel: () => void } | null} */
   let currentAudio = null;
   /** @type {string[]} */
   let words = [];
@@ -67,15 +73,18 @@
     }
   }
   
-  // When auto-backspace is disabled, lock input (except navigation/deletion) while over the limit
-  $: isLockedOverLimit = !settings.autoBackspace && syllableCounts.some((count, index) => count > expectedSyllables[index]);
-  $: isInputBlocked = isTemporarilyBlocked || isLockedOverLimit;
+  // Track if we're over limit for word boundary blocking (not immediate blocking)
+  $: isOverLimit = syllableCounts.some((count, index) => count > expectedSyllables[index]);
+  $: isInputBlocked = isTemporarilyBlocked;
   
   // Calculate dynamic height based on poem type
   $: titleHeight = 60; // Height for title input
-  $: lineHeight = 32; // Approximate height per line
+  $: lineHeight = 32.4; // Actual line height: 1.8 * 18px = 32.4px
   $: padding = 24; // Container padding
   $: expandedHeight = titleHeight + (expectedLines * lineHeight) + padding + 40; // Extra space for title when shrunk
+  
+  // Precalculated textarea height based on poem type
+  $: textareaHeight = expectedLines * lineHeight;
   
   // Handle title submission
   async function handleTitleSubmit() {
@@ -91,6 +100,49 @@
     }
   }
   
+  // Handle title click to edit
+  function handleTitleClick() {
+    step = 'title';
+    isExpanded = false;
+    
+    // Focus the title input after shrinking
+    setTimeout(() => {
+      const titleInput = document.querySelector('.title-input');
+      if (titleInput) {
+        // @ts-ignore - focus method exists on input elements
+        titleInput.focus();
+      }
+    }, 0);
+  }
+  
+  // Handle title keyboard interaction
+  /** @param {KeyboardEvent} event */
+  function handleTitleKeydown(event) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleTitleClick();
+    }
+  }
+  
+  // Update debounced validation for UI elements (300ms delay)
+  /** @param {{ isValid: boolean, isComplete: boolean, feedback: string }} newValidation */
+  function updateDebouncedValidation(newValidation) {
+    // Clear existing timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+    }
+    
+    // If validation becomes invalid, immediately update debounced state
+    if (!newValidation.isValid) {
+      debouncedValidation = { ...newValidation };
+    } else {
+      // If validation becomes valid, debounce the update (300ms delay)
+      validationTimeout = setTimeout(() => {
+        debouncedValidation = { ...newValidation };
+      }, 300);
+    }
+  }
+
   // Handle haiku submission
   function handleHaikuSubmit() {
     if (validation.isValid && validation.isComplete) {
@@ -103,7 +155,15 @@
   }
   
   // Handle TTS toggle
-  async function handleTTSToggle() {
+  function handleTTSToggle() {
+    if (!settings.enableTTS) {
+      dispatch('toast', {
+        message: 'Text-to-speech is disabled in Settings.',
+        type: 'warning'
+      });
+      return;
+    }
+    
     if (!isValidApiKey(settings.elevenlabsApiKey)) {
       dispatch('toast', {
         message: 'Add your ElevenLabs API key in Settings to enable text-to-speech.',
@@ -112,59 +172,59 @@
       return;
     }
     
+    // Toggle TTS state immediately - prevent multiple calls
     if (isPlaying) {
       stopTTS();
     } else {
-      await startTTS();
+      // Set playing state immediately before starting
+      isPlaying = true;
+      performTTS();
     }
   }
   
 
 
-  // Start text-to-speech
-  async function startTTS() {
+  // Perform the actual TTS call asynchronously
+  async function performTTS() {
     console.log('TTS start');
-    if (!content.trim() || !isValidApiKey(settings.elevenlabsApiKey)) return;
+    if (!content.trim() || !settings.enableTTS || !isValidApiKey(settings.elevenlabsApiKey)) {
+      isPlaying = false;
+      return;
+    }
     
     try {
-      cancelScheduledClearHighlighting();
-      isPlaying = true;
-      highlightedWordIndex = -1;
-      
       const textToSpeak = content;
       
-      // Prefer low-latency streaming playback with timing
-      // Parse text into words for highlighting
-      currentWords = parseTextIntoWords(textToSpeak);
+      // NOTE: Highlighting functionality was disabled due to being broken
+      // The canvas-based highlighting system had issues with positioning and timing
+      // Instead, we now use simple text dimming during TTS playback
 
-      // Set playing state
-      isPlaying = true;
-
-      // Wait for canvas to render, then setup highlighting
-      await tick();
-      if (highlightCanvas && textareaElement) {
-        setupCanvasHighlighting();
-      }
-
-      // Try the SIMPLE approach first (non-streaming, from working example)
-      await simpleTextToSpeechWithTiming(
+      // Use simple TTS without highlighting
+      const ttsPromise = simpleTextToSpeechWithTiming(
         textToSpeak,
         settings.elevenlabsApiKey,
         (/** @type {number} */ wordIndex, /** @type {number} */ lineIndex) => {
-          highlightedWordIndex = wordIndex;
+          // Highlighting disabled - no-op
         },
         {
           pauseDuration: settings.ttsPauseDuration || 1.0
         }
       );
+      
+      // Store the promise so we can handle cancellation in stopTTS
+      currentAudio = { cancel: () => { isPlaying = false; } };
+      
+      await ttsPromise;
 
-      // Audio finished playing (handled internally by streaming function)
+      // Audio finished playing
       isPlaying = false;
+      currentAudio = null;
       console.log('TTS completed');
       
     } catch (err) {
       console.error('TTS Error:', err);
       isPlaying = false;
+      currentAudio = null;
       
       // Show specific error message
       let errorMessage = 'Text-to-speech failed. ';
@@ -191,24 +251,36 @@
   
   // Stop text-to-speech
   function stopTTS() {
-    // For Web Audio API implementation, we can't directly stop playback
-    // The streaming function handles cleanup internally
-    // Just reset UI state
     console.log('TTS stop');
     isPlaying = false;
-    currentAudio = null;
+    
+    // Cancel any current TTS
+    if (currentAudio) {
+      if ('cancel' in currentAudio) {
+        currentAudio.cancel();
+      } else {
+        // HTML Audio element
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+      currentAudio = null;
+    }
+    
+    // Clear any scheduled highlighting (disabled)
+    // cancelScheduledClearHighlighting();
   }
   
   function scheduleClearHighlighting(delay = 3000) {
     cancelScheduledClearHighlighting();
     clearHighlightTimeoutId = setTimeout(() => {
       highlightedWordIndex = -1;
-      if (highlightCanvas) {
-        const ctx = highlightCanvas.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
-        }
-      }
+      // NOTE: Canvas highlighting was disabled due to being broken
+      // if (highlightCanvas) {
+      //   const ctx = highlightCanvas.getContext('2d');
+      //   if (ctx) {
+      //     ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+      //   }
+      // }
       clearHighlightTimeoutId = null;
     }, delay);
   }
@@ -280,166 +352,180 @@
     return words;
   }
 
-  // Reactive statement to update highlighting
-  $: if (currentWords.length > 0 && highlightedWordIndex >= 0) {
-    currentWords = currentWords.map(item => ({
-      ...item,
-      isHighlighted: item.index === highlightedWordIndex
-    }));
-    
-    // Draw highlights on canvas
-    if (highlightCanvas) {
-      drawCanvasHighlights();
-    }
+  // NOTE: Highlighting functionality was disabled due to being broken
+  // The canvas-based highlighting system had issues with positioning and timing
+  // Instead, we now use simple text dimming during TTS playback
+  
+  // Reactive statement to update highlighting (DISABLED)
+  // $: if (currentWords.length > 0 && highlightedWordIndex >= 0) {
+  //   currentWords = currentWords.map(item => ({
+  //     ...item,
+  //     isHighlighted: item.index === highlightedWordIndex
+  //   }));
+  //   
+  //   // Draw highlights on canvas
+  //   if (highlightCanvas) {
+  //     drawCanvasHighlights();
+  //   }
+  //
+  //   // Reset a 1s clear timer on each index update; if updates stop, clear
+  //   scheduleClearHighlighting(1000);
+  // }
 
-    // Reset a 1s clear timer on each index update; if updates stop, clear
-    scheduleClearHighlighting(1000);
-  }
-
+  // NOTE: Canvas highlighting functions were disabled due to being broken
+  // The highlighting system had issues with positioning and timing
+  // Instead, we now use simple text dimming during TTS playback
+  
   /**
-   * Setup canvas-based highlighting with pixel-perfect measurements
+   * Setup canvas-based highlighting with pixel-perfect measurements (DISABLED)
    */
-  function setupCanvasHighlighting() {
-    if (!highlightCanvas || !textareaElement) return;
-    
-    // Get textarea dimensions and styles
-    const rect = textareaElement.getBoundingClientRect();
-    const styles = window.getComputedStyle(textareaElement);
-    
-    // Setup canvas to match textarea exactly
-    highlightCanvas.width = rect.width;
-    highlightCanvas.height = rect.height;
-    highlightCanvas.style.width = rect.width + 'px';
-    highlightCanvas.style.height = rect.height + 'px';
-    
-    const ctx = highlightCanvas.getContext('2d');
-    if (!ctx) return;
-    
-    // Copy font properties to canvas context
-    ctx.font = `${styles.fontStyle} ${styles.fontVariant} ${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`;
-    ctx.textBaseline = 'top';
-    
-    // Calculate word positions using canvas measurements
-    calculateWordPositions(ctx, styles);
-    
-    // Canvas highlighting initialized
-  }
+  // function setupCanvasHighlighting() {
+  //   if (!highlightCanvas || !textareaElement) return;
+  //   
+  //   // Get textarea dimensions and styles
+  //   const rect = textareaElement.getBoundingClientRect();
+  //   const styles = window.getComputedStyle(textareaElement);
+  //   
+  //   // Setup canvas to match textarea exactly
+  //   highlightCanvas.width = rect.width;
+  //   highlightCanvas.height = rect.height;
+  //   highlightCanvas.style.width = rect.width + 'px';
+  //   highlightCanvas.style.height = rect.height + 'px';
+  //   
+  //   const ctx = highlightCanvas.getContext('2d');
+  //   if (!ctx) return;
+  //   
+  //   // Copy font properties to canvas context
+  //   ctx.font = `${styles.fontStyle} ${styles.fontVariant} ${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`;
+  //   ctx.textBaseline = 'top';
+  //   
+  //   // Calculate word positions using canvas measurements
+  //   calculateWordPositions(ctx, styles);
+  //   
+  //   // Canvas highlighting initialized
+  // }
 
+  // NOTE: Word position calculation was disabled due to highlighting being broken
+  
   /**
-   * Calculate exact pixel positions for each word using canvas measurements
+   * Calculate exact pixel positions for each word using canvas measurements (DISABLED)
    */
+  // /**
+  //  * @param {CanvasRenderingContext2D} ctx
+  //  * @param {CSSStyleDeclaration} styles
+  //  */
+  // function calculateWordPositions(ctx, styles) {
+  //   const padding = {
+  //     left: parseFloat(styles.paddingLeft),
+  //     top: parseFloat(styles.paddingTop)
+  //   };
+  //   const lineHeight = parseFloat(styles.lineHeight);
+  //   
+  //   let x = padding.left;
+  //   let y = padding.top;
+  //   let lineIndex = 0;
+  //   
+  //   // Add position data to each word
+  //   currentWords = currentWords.map(wordItem => {
+  //     if (wordItem.isSpace) {
+  //       const spaceWidth = ctx.measureText(' ').width;
+  //       x += spaceWidth;
+  //       return { ...wordItem, x, y, width: spaceWidth, height: lineHeight };
+  //     } else if (wordItem.word === '\n') {
+  //       // New line
+  //       x = padding.left;
+  //       y += lineHeight;
+  //       lineIndex++;
+  //       return { ...wordItem, x, y, width: 0, height: lineHeight };
+  //     } else {
+  //       // Regular word or punctuation
+  //       const metrics = ctx.measureText(wordItem.word);
+  //       const wordWidth = metrics.width;
+  //       const wordX = x;
+  //       
+  //       x += wordWidth;
+  //       
+  //       return { 
+  //         ...wordItem, 
+  //         x: wordX, 
+  //         y, 
+  //         width: wordWidth, 
+  //         height: lineHeight,
+  //         lineIndex 
+  //       };
+  //     }
+  //   });
+  //   
+  //   // Word positions calculated
+  // }
+
+  // NOTE: Canvas highlighting drawing was disabled due to highlighting being broken
+  
   /**
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {CSSStyleDeclaration} styles
+   * Draw highlights on canvas using calculated positions (DISABLED)
    */
-  function calculateWordPositions(ctx, styles) {
-    const padding = {
-      left: parseFloat(styles.paddingLeft),
-      top: parseFloat(styles.paddingTop)
-    };
-    const lineHeight = parseFloat(styles.lineHeight);
-    
-    let x = padding.left;
-    let y = padding.top;
-    let lineIndex = 0;
-    
-    // Add position data to each word
-    currentWords = currentWords.map(wordItem => {
-      if (wordItem.isSpace) {
-        const spaceWidth = ctx.measureText(' ').width;
-        x += spaceWidth;
-        return { ...wordItem, x, y, width: spaceWidth, height: lineHeight };
-      } else if (wordItem.word === '\n') {
-        // New line
-        x = padding.left;
-        y += lineHeight;
-        lineIndex++;
-        return { ...wordItem, x, y, width: 0, height: lineHeight };
-      } else {
-        // Regular word or punctuation
-        const metrics = ctx.measureText(wordItem.word);
-        const wordWidth = metrics.width;
-        const wordX = x;
-        
-        x += wordWidth;
-        
-        return { 
-          ...wordItem, 
-          x: wordX, 
-          y, 
-          width: wordWidth, 
-          height: lineHeight,
-          lineIndex 
-        };
-      }
-    });
-    
-    // Word positions calculated
-  }
-
-  /**
-   * Draw highlights on canvas using calculated positions
-   */
-  function drawCanvasHighlights() {
-    if (!highlightCanvas) return;
-    
-    const ctx = highlightCanvas.getContext('2d');
-    if (!ctx) return;
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
-    
-    // Draw highlights for highlighted words
-    currentWords.forEach(wordItem => {
-      if (
-        wordItem.isHighlighted &&
-        wordItem.x !== undefined &&
-        wordItem.y !== undefined &&
-        wordItem.width !== undefined &&
-        wordItem.height !== undefined
-      ) {
-        const padding = 3;
-        const borderRadius = 4;
-        const x = wordItem.x - padding;
-        const y = wordItem.y + 1;
-        const width = wordItem.width + (padding * 2);
-        const height = wordItem.height - 2;
-        
-        // Create rounded rectangle path
-        ctx.beginPath();
-        ctx.roundRect(x, y, width, height, borderRadius);
-        
-        // Fill with green gradient
-        const gradient = ctx.createLinearGradient(x, y, x, y + height);
-        gradient.addColorStop(0, 'rgba(34, 197, 94, 0.25)'); // green-500 with transparency
-        gradient.addColorStop(1, 'rgba(34, 197, 94, 0.35)');
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        
-        // Add subtle green border
-        ctx.strokeStyle = 'rgba(34, 197, 94, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        
-        // Add inner glow effect
-        ctx.beginPath();
-        ctx.roundRect(x + 0.5, y + 0.5, width - 1, height - 1, borderRadius - 0.5);
-        ctx.strokeStyle = 'rgba(34, 197, 94, 0.2)';
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
-        
-        // Drew green highlight
-      }
-    });
-  }
+  // function drawCanvasHighlights() {
+  //   if (!highlightCanvas) return;
+  //   
+  //   const ctx = highlightCanvas.getContext('2d');
+  //   if (!ctx) return;
+  //   
+  //   // Clear canvas
+  //   ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+  //   
+  //   // Draw highlights for highlighted words
+  //   currentWords.forEach(wordItem => {
+  //     if (
+  //       wordItem.isHighlighted &&
+  //       wordItem.x !== undefined &&
+  //       wordItem.y !== undefined &&
+  //       wordItem.width !== undefined &&
+  //       wordItem.height !== undefined
+  //     ) {
+  //       const padding = 3;
+  //       const borderRadius = 4;
+  //       const x = wordItem.x - padding;
+  //       const y = wordItem.y + 1;
+  //       const width = wordItem.width + (padding * 2);
+  //       const height = wordItem.height - 2;
+  //       
+  //       // Create rounded rectangle path
+  //       ctx.beginPath();
+  //       ctx.roundRect(x, y, width, height, borderRadius);
+  //       
+  //       // Fill with green gradient
+  //       const gradient = ctx.createLinearGradient(x, y, x, y + height);
+  //       gradient.addColorStop(0, 'rgba(34, 197, 94, 0.25)'); // green-500 with transparency
+  //       gradient.addColorStop(1, 'rgba(34, 197, 94, 0.35)');
+  //       ctx.fillStyle = gradient;
+  //       ctx.fill();
+  //       
+  //       // Add subtle green border
+  //       ctx.strokeStyle = 'rgba(34, 197, 94, 0.4)';
+  //       ctx.lineWidth = 1;
+  //       ctx.stroke();
+  //       
+  //       // Add inner glow effect
+  //       ctx.beginPath();
+  //       ctx.roundRect(x + 0.5, y + 0.5, width - 1, height - 1, borderRadius - 0.5);
+  //       ctx.strokeStyle = 'rgba(34, 197, 94, 0.2)';
+  //       ctx.lineWidth = 0.5;
+  //       ctx.stroke();
+  //       
+  //       // Drew green highlight
+  //     }
+  //   });
+  // }
 
 
 
-  // Simple highlighting - just update reactive variable
-  /** @param {number} wordIndex @param {string} text */
-  function updateHighlighting(wordIndex, text) {
-    // Highlighting is now handled by Svelte reactivity
-  }
+  // NOTE: Simple highlighting was disabled due to highlighting being broken
+  
+  // Simple highlighting - just update reactive variable (DISABLED)
+  // /** @param {number} wordIndex @param {string} text */
+  // function updateHighlighting(wordIndex, text) {
+  //   // Highlighting is now handled by Svelte reactivity
+  // }
   
   // Dispatch cursor position for scrolling indicators
   function dispatchCursorPosition() {
@@ -458,6 +544,13 @@
     if (content !== undefined && step === 'content') {
       updateSyllableCounts(content).catch(error => {
         console.error('Syllable counting error:', error);
+        // Dispatch error to parent component
+        dispatch('toast', {
+          message: 'Syllable counting failed. Please refresh the page.',
+          type: 'error'
+        });
+        // Also throw the error to trigger global error handler
+        throw error;
       });
     }
   }
@@ -472,10 +565,15 @@
       const overall = await validateHaiku(text, expectedSyllables, currentPoemType.name);
       validation = overall; // Store for submit button state
       dispatch('validation', overall);
+      
+      // Update debounced validation for UI elements
+      updateDebouncedValidation(overall);
     } catch (error) {
       console.error('Syllable counting error:', error);
       syllableCounts = new Array(maxLines).fill(0);
-      dispatch('validation', { isValid: false, isComplete: false, feedback: '' });
+      const errorValidation = { isValid: false, isComplete: false, feedback: '' };
+      dispatch('validation', errorValidation);
+      updateDebouncedValidation(errorValidation);
     }
   }
   
@@ -508,13 +606,18 @@
       validation = validationResult; // Store for submit button state
       dispatch('validation', validationResult);
       
+      // Update debounced validation for UI elements
+      updateDebouncedValidation(validationResult);
+      
       // Store the text for this validation to avoid duplicate validations
       lastWordSubmissionValidation = text;
       
     } catch (error) {
       console.error('Validation error:', error);
-      validation = { isValid: false, isComplete: false, feedback: 'Validation error' };
-      dispatch('validation', validation);
+      const errorValidation = { isValid: false, isComplete: false, feedback: 'Validation error' };
+      validation = errorValidation;
+      dispatch('validation', errorValidation);
+      updateDebouncedValidation(errorValidation);
     }
   }
   
@@ -636,6 +739,24 @@
       }
     }
     
+    // Handle word boundary blocking when auto-backspace is disabled
+    if (!settings.autoBackspace && isOverLimit && event.key === ' ') {
+      // User is trying to complete a word while over the limit
+      event.preventDefault();
+      
+      if (settings.enableShake) {
+        shakeWindow();
+      }
+      
+      // Show visual feedback that input is blocked
+      isTemporarilyBlocked = true;
+      setTimeout(() => {
+        isTemporarilyBlocked = false;
+      }, 1000);
+      
+      return;
+    }
+    
     const cursorPos = textareaElement.selectionStart;
     
     // Allow special keys (including navigation)
@@ -646,6 +767,26 @@
     ];
     
     if (allowedKeys.includes(event.key)) {
+      // Handle backspace to shrink back to title input
+      if (event.key === 'Backspace') {
+        // If content is empty or cursor is at the beginning, shrink back to title
+        if (content.trim() === '' || cursorPos === 0) {
+          event.preventDefault();
+          step = 'title';
+          isExpanded = false;
+          
+          // Focus the title input after shrinking
+          setTimeout(() => {
+            const titleInput = document.querySelector('.title-input');
+            if (titleInput) {
+              // @ts-ignore - focus method exists on input elements
+              titleInput.focus();
+            }
+          }, 0);
+          return;
+        }
+      }
+      
       // Dispatch cursor position for navigation keys
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
         setTimeout(() => dispatchCursorPosition(), 0);
@@ -694,6 +835,12 @@
     
     // Handle SPACE - trigger word submission validation
     if (event.key === ' ') {
+      // Check if we're over limit and auto-backspace is disabled
+      if (!settings.autoBackspace && currentSyll > expectedSyll) {
+        // Block the space - this is handled by the word boundary blocking above
+        return;
+      }
+      
       // Allow the space to be typed first
       setTimeout(() => {
         // Trigger validation after the space is added
@@ -775,13 +922,6 @@
     });
   }
   
-  // Auto-resize textarea based on content
-  function autoResize() {
-    if (textareaElement) {
-      textareaElement.style.height = 'auto';
-      textareaElement.style.height = Math.max(expectedLines * lineHeight, textareaElement.scrollHeight) + 'px';
-    }
-  }
   
   // Reset function
   export function reset() {
@@ -793,26 +933,17 @@
   }
   
   // Update content and trigger validation
+  /** @param {string} newContent */
   export function updateContent(newContent) {
     content = newContent;
     isExpanded = true;
     step = 'content';
     
-    // Trigger syllable counting and validation
-    tick().then(() => {
-      if (textareaElement) {
-        handleInput({ target: textareaElement });
-      }
-    });
+    // The reactive statement will automatically handle syllable counting and validation
+    // when content changes, so no need to manually trigger it
   }
   
-  onMount(async () => {
-    try {
-      await initializeSyllableCounter();
-    } catch (error) {
-      console.error('Failed to initialize syllable counter:', error);
-    }
-  });
+  // Note: Syllable counter initialization is handled by the parent component
   
   // Cleanup
   import { onDestroy } from 'svelte';
@@ -831,13 +962,20 @@
 >
   <!-- Title when expanded (shrunk and positioned top-left) -->
   {#if step === 'content' && title}
-    <div class="title-shrunk">
+    <div 
+      class="title-shrunk" 
+      role="button"
+      tabindex="0"
+      on:click={handleTitleClick}
+      on:keydown={handleTitleKeydown}
+      aria-label="Edit title"
+    >
       {title}
     </div>
   {/if}
   
-  <!-- TTS Speaker Icon (top-right when content exists) -->
-  {#if step === 'content' && content.trim()}
+  <!-- TTS Speaker Icon (top-right when content exists and TTS is enabled) -->
+  {#if step === 'content' && content.trim() && settings.enableTTS}
     <button 
       class="tts-button"
       class:playing={isPlaying}
@@ -879,30 +1017,19 @@
       <div class="textarea-container">
         <!-- Debug info removed - highlighting working perfectly! -->
 
-        <!-- Canvas-based highlighting overlay -->
-        {#if currentWords.length > 0}
-          <canvas 
-            bind:this={highlightCanvas}
-            class="highlight-canvas"
-            style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 5;"
-          ></canvas>
-        {:else if highlightedWordIndex >= 0}
-          <div class="simple-highlight">
-            Word {highlightedWordIndex} is being spoken
-          </div>
-        {/if}
+        <!-- NOTE: Canvas-based highlighting was disabled due to being broken -->
+        <!-- The highlighting system had issues with positioning and timing -->
+        <!-- Instead, we now use simple text dimming during TTS playback -->
         
         <textarea
           bind:this={textareaElement}
           bind:value={content}
-          on:input={autoResize}
-          on:focus={() => autoResize()}
           on:keydown={handleKeydown}
           on:paste={handlePaste}
           on:click={dispatchCursorPosition}
           on:keyup={dispatchCursorPosition}
           placeholder="Write your {currentPoemType.name.toLowerCase()} here..."
-          class="content-textarea {isInputBlocked ? 'opacity-50 pointer-events-none' : ''}"
+          class="content-textarea {isInputBlocked ? 'opacity-50 pointer-events-none' : ''} {isPlaying ? 'tts-playing' : ''}"
           class:has-highlight={highlightedWordIndex >= 0}
           rows={expectedLines}
           autocomplete="off"
@@ -910,11 +1037,12 @@
           data-1p-ignore
           data-lpignore="true"
           data-form-type="other"
+          style="height: {textareaHeight}px;"
         ></textarea>
       </div>
       
       <!-- Submit button for completed haiku -->
-      {#if validation.isValid && validation.isComplete}
+      {#if debouncedValidation.isValid && debouncedValidation.isComplete}
         <button 
           class="haiku-submit-button"
           on:click={handleHaikuSubmit}
@@ -959,6 +1087,14 @@
     opacity: 0;
     transform: translateY(10px);
     animation: slideInTitle 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+  }
+  
+  .title-shrunk:hover {
+    background-color: rgba(0, 0, 0, 0.05);
   }
   
   @keyframes slideInTitle {
@@ -1012,13 +1148,17 @@
   }
   
   .content-textarea {
-    min-height: calc(var(--expected-lines) * 32px);
-    max-height: calc(var(--expected-lines) * 32px);
     overflow: hidden; /* No scrollbars */
   }
   
   .content-textarea::placeholder {
     color: var(--text-tertiary, #9ca3af);
+  }
+  
+  /* TTS playing state - dim text during playback */
+  .content-textarea.tts-playing {
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
   }
   
   .submit-button {
@@ -1038,6 +1178,7 @@
     justify-content: center;
     font-size: 18px;
     transition: all 0.2s ease;
+    z-index: 20;
   }
   
   .submit-button:hover {
@@ -1056,7 +1197,7 @@
     color: white;
     border: none;
     border-radius: 8px;
-    cursor: pointer;
+    cursor: pointer !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1066,16 +1207,24 @@
     box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     animation: submitButtonAppear 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    z-index: 20;
   }
   
   .haiku-submit-button:hover {
     background: #059669; /* Green-600 */
     transform: scale(1.05);
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    cursor: pointer !important;
   }
   
   .haiku-submit-button:active {
     transform: scale(0.98);
+    cursor: pointer !important;
+  }
+  
+  .haiku-submit-button:focus {
+    cursor: pointer !important;
   }
   
   .submit-text {
@@ -1282,6 +1431,7 @@
     width: 100% !important;
     height: 100% !important;
     padding: var(--content-padding-block, 8px) var(--content-padding-inline, 16px) !important;
+    padding-bottom: calc(var(--content-padding-block, 8px) + 6px) !important; /* Extra space for descenders */
     margin: 0 !important;
     border: none !important;
     outline: none !important;
@@ -1306,6 +1456,10 @@
     
     .title-shrunk {
       color: var(--text-primary, #f9fafb);
+    }
+    
+    .title-shrunk:hover {
+      background-color: rgba(255, 255, 255, 0.1);
     }
     
     .tts-button {

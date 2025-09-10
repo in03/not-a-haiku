@@ -6,24 +6,13 @@ export const defaultSettings = {
   enableConfetti: true,
   poemType: 'haiku',
   showProgressBar: false,
-  preset: 'default', // 'default' | 'focus' | 'custom'
   elevenlabsApiKey: '', // ElevenLabs API key for text-to-speech
-  ttsPauseDuration: 1.0 // Pause duration between lines in seconds (default 1 second)
+  ttsPauseDuration: 1.0, // Pause duration between lines in seconds (default 1 second)
+  enableTaskTracking: false, // Enable task tracking for haikus (todo/in_progress/done)
+  enableTTS: false, // Enable text-to-speech functionality
+  enableCritique: false // Enable AI analysis and critique
 };
 
-export const focusPreset = {
-  // Visual/behavior tweaks tailored for deep focus
-  autoBackspace: true,
-  enableShake: false,
-  enableConfetti: false,
-  showProgressBar: true,
-  // focus preset no longer hides editor chrome; progress bar remains
-};
-
-export const presets = {
-  default: defaultSettings,
-  focus: { ...defaultSettings, ...focusPreset }
-};
 
 function safeGetStoredSettings() {
   try {
@@ -83,20 +72,6 @@ function createSettingsStore() {
       set(next);
     },
     defaultSettings,
-    /** @param {'default'|'focus'} name */
-    applyPreset: (name) => {
-      const base = presets[/** @type {'default'|'focus'} */(name)] || defaultSettings;
-      update((current) => {
-        const next = {
-          ...current,
-          ...base,
-          poemType: current.poemType,
-          preset: name
-        };
-        persistSettings(next);
-        return next;
-      });
-    }
   };
 }
 

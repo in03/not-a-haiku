@@ -1,16 +1,21 @@
 <script>
-  import { Star, Sparkles, Brain, Tag } from 'lucide-svelte';
-  import { onMount } from 'svelte';
+  import { Star, Tag, Brain } from 'lucide-svelte';
+  import { onMount, createEventDispatcher } from 'svelte';
+
+  const dispatch = createEventDispatcher();
 
   /** @type {{ rating: number; comment: string; tags: string[] } | null} */
   export let analysis = null;
   export let isVisible = false;
+  /** @type {string} */
+  export let title = '';
+  /** @type {string} */
+  export let content = '';
 
   /** @type {boolean[]} */
   let starsAnimated = [];
   let commentVisible = false;
   let tagsVisible = false;
-  let sparklesVisible = false;
 
   // Reset animations when analysis changes
   $: if (analysis) {
@@ -28,7 +33,6 @@
     starsAnimated = Array(5).fill(false);
     commentVisible = false;
     tagsVisible = false;
-    sparklesVisible = false;
   }
 
   async function startAnimations() {
@@ -46,10 +50,6 @@
       starsAnimated[i] = true;
       starsAnimated = [...starsAnimated]; // Trigger reactivity
     }
-    
-    // Show sparkles after stars
-    await new Promise(resolve => setTimeout(resolve, 200));
-    sparklesVisible = true;
     
     // Show comment
     await new Promise(resolve => setTimeout(resolve, 300));
@@ -105,34 +105,42 @@
 {#if analysis && isVisible}
   <div class="bg-base-200 rounded-xl shadow-lg p-8 text-center space-y-6 border border-base-300">
     <!-- Header -->
-    <div class="flex items-center justify-center gap-3 mb-6">
-      <Brain class="w-6 h-6 text-primary" />
-      <h2 class="text-2xl font-bold text-base-content">AI Analysis</h2>
-      {#if sparklesVisible}
-        <Sparkles class="w-6 h-6 text-yellow-500 animate-pulse" />
+    <div class="flex items-center justify-center gap-2 mb-6">
+      <Brain class="w-6 h-6" />
+      <h2 class="text-2xl font-bold text-base-content">Analysis</h2>
+    </div>
+
+    <!-- Haiku Display -->
+    <div class="bg-base-100 rounded-lg p-6 mb-6 border border-base-300">
+      {#if title}
+        <h3 class="text-lg font-semibold text-base-content mb-3">{title}</h3>
       {/if}
+      <div class="text-base-content/80 italic leading-relaxed whitespace-pre-line">
+        {content}
+      </div>
     </div>
 
     <!-- Star Rating -->
     <div class="flex items-center justify-center gap-2 mb-6">
       {#each Array(5) as _, i}
         <div
-          class="transition-all duration-300 ease-out {starsAnimated[i] ? 'scale-100 opacity-100' : 'scale-50 opacity-0'}"
-          style="transition-delay: {i * 150}ms"
+          class="transition-all duration-300 ease-out {starsAnimated[i] || i >= analysis.rating ? 'scale-100 opacity-100' : 'scale-50 opacity-0'}"
+          style="transition-delay: {i < analysis.rating ? i * 150 : 0}ms"
         >
-          <Star 
-            class="w-8 h-8 {getStarColor(i, analysis.rating)} {i < analysis.rating ? 'fill-current' : ''} transition-colors duration-200"
-          />
+          {#if i < analysis.rating}
+            <!-- Filled star -->
+            <Star 
+              class="w-8 h-8 text-yellow-400 fill-current"
+            />
+          {:else}
+            <!-- Unfilled star -->
+            <Star 
+              class="w-8 h-8 text-gray-400 fill-none stroke-2"
+            />
+          {/if}
         </div>
       {/each}
     </div>
-
-    <!-- Rating Text -->
-    {#if starsAnimated[Math.min(4, analysis.rating - 1)]}
-      <div class="text-lg font-semibold text-base-content/70 animate-fade-in">
-        {analysis.rating} out of 5 stars
-      </div>
-    {/if}
 
     <!-- Comment -->
     {#if commentVisible}
@@ -149,7 +157,7 @@
       <div class="animate-slide-up" style="animation-delay: 200ms">
         <h4 class="text-lg font-semibold text-base-content mb-4 flex items-center justify-center gap-2">
           <Tag class="w-5 h-5" />
-          Task Categories
+          Categories
         </h4>
         <div class="flex flex-wrap gap-2 justify-center">
           {#each analysis.tags as tag, i}
@@ -164,15 +172,7 @@
       </div>
     {/if}
 
-    <!-- Decorative Elements -->
-    {#if sparklesVisible}
-      <div class="absolute -top-2 -right-2 text-yellow-400 animate-pulse">
-        <Sparkles class="w-4 h-4" />
-      </div>
-      <div class="absolute -bottom-2 -left-2 text-yellow-400 animate-pulse" style="animation-delay: 500ms">
-        <Sparkles class="w-4 h-4" />
-      </div>
-    {/if}
+
   </div>
 {/if}
 

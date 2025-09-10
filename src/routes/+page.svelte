@@ -1,16 +1,41 @@
 <script>
-  import { Sparkles, Leaf } from 'lucide-svelte';
+  import { Sparkles, Leaf, Edit3 } from 'lucide-svelte';
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import UnifiedHaikuInput from '$lib/components/UnifiedHaikuInput.svelte';
   import AnalysisResults from '$lib/components/AnalysisResults.svelte';
   import Toast from '$lib/components/Toast.svelte';
+  import ModelErrorModal from '$lib/components/ModelErrorModal.svelte';
   import { settingsStore } from '$lib/stores/settings.js';
   import { authStore } from '$lib/stores/auth.js';
+  import { haikuStore } from '$lib/stores/haiku-db.js';
   import { poemTypes } from '$lib/poemTypes.js';
   import { analyzeHaiku } from '$lib/github-models.js';
+  import { initializeSyllableCounter } from '$lib/onnx-syllable-counter.js';
   import confetti from 'canvas-confetti';
   import { onMount } from 'svelte';
+  
+  // Initialize syllable counter on mount
+  onMount(async () => {
+    try {
+      const success = await initializeSyllableCounter();
+      if (!success) {
+        modelError = new Error('Failed to initialize syllable counter');
+        showModelError = true;
+      }
+    } catch (error) {
+      modelError = error instanceof Error ? error : new Error(String(error));
+      showModelError = true;
+    }
+    
+    // Global error handler for ML errors
+    window.addEventListener('error', (event) => {
+      if (event.error && event.error.message && event.error.message.includes('ML syllable counting failed')) {
+        modelError = event.error;
+        showModelError = true;
+      }
+    });
+  });
   
   let title = '';
   let content = '';
@@ -19,10 +44,22 @@
   let syllableCounts = [];
   /** @type {number[]} */
   let expectedSyllables = [];
+  
+  // Debounced UI state for smoother animations
+  let debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let validationTimeout = null;
+  let progressBarValue = 0;
+  let progressBarTarget = 0;
   let showToast = false;
   let toastMessage = '';
   let toastType = 'info';
   let celebrationIndex = 0;
+  
+  // Model error state
+  let showModelError = false;
+  /** @type {Error | null} */
+  let modelError = null;
   /** @type {any} */
   let unifiedInputComponent;
   /** @type {HTMLDivElement | null} */
@@ -32,10 +69,20 @@
   /** @type {{ rating: number; comment: string; tags: string[] } | null} */
   let analysis = null;
   let showAnalysis = false;
+  
+  // Current haiku ID for updating with analysis
+  let currentHaikuId = null;
   let isAnalyzing = false;
+  let isEditingHaiku = false;
   
   // Function to start a new haiku
   function startNewHaiku() {
+    // Clear any pending validation timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+      validationTimeout = null;
+    }
+    
     if (unifiedInputComponent) {
       unifiedInputComponent.reset();
     }
@@ -43,8 +90,44 @@
     content = '';
     syllableCounts = [];
     validation = { isValid: false, isComplete: false, feedback: '' };
+    debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
     analysis = null;
     showAnalysis = false;
+    currentHaikuId = null;
+    isEditingHaiku = false;
+  }
+
+  // Function to edit the current haiku
+  function handleEditHaiku() {
+    // Clear any pending validation timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+      validationTimeout = null;
+    }
+    
+    // Hide analysis and go back to input form
+    showAnalysis = false;
+    analysis = null;
+    
+    // Set editing mode
+    isEditingHaiku = true;
+    
+    // Reset validation states
+    validation = { isValid: false, isComplete: false, feedback: '' };
+    debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
+    
+    // Set the form to content step since we have content
+    if (unifiedInputComponent) {
+      unifiedInputComponent.step = 'content';
+      unifiedInputComponent.isExpanded = true;
+    }
+    
+    // Focus the textarea after a brief delay
+    setTimeout(() => {
+      if (unifiedInputComponent && unifiedInputComponent.textareaElement) {
+        unifiedInputComponent.textareaElement.focus();
+      }
+    }, 100);
   }
   
   // All available haiku templates
@@ -67,7 +150,7 @@
     {
       id: 'wifi-woes',
       title: '📶 wifi woes',
-      content: 'Password incorrect\nBut I typed it perfectly\nRouter, you\'re a liar'
+      content: 'Password incorrect\nBut I typed it perfectly\nRouter why you suck'
     },
     {
       id: 'monday-blues',
@@ -77,7 +160,7 @@
     {
       id: 'autocorrect-fail',
       title: '📱 autocorrect fail',
-      content: 'Ducking phone thinks it\nknows what I want to say but\nit really doesn\'t'
+      content: 'Autocorrect strikes\nChanging words I never meant\nMessages confused'
     },
     {
       id: 'procrastination',
@@ -162,24 +245,102 @@
     const previousValid = validation.isValid;
     validation = event.detail;
     
-    // Cycle celebration message when haiku becomes valid
-    if (!previousValid && validation.isValid) {
-      celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
+    // Clear existing timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
     }
+    
+    // If validation becomes invalid, immediately update debounced state
+    if (!validation.isValid) {
+      debouncedValidation = { ...validation };
+    } else {
+      // If validation becomes valid, debounce the update (300ms delay)
+      validationTimeout = setTimeout(() => {
+        const previousDebouncedValid = debouncedValidation.isValid;
+        debouncedValidation = { ...validation };
+        
+        // Cycle celebration message when haiku becomes valid
+        if (!previousDebouncedValid && debouncedValidation.isValid) {
+          celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
+        }
+      }, 300);
+    }
+    
+    // Update progress bar target immediately for smooth animation
+    updateProgressBarTarget();
   }
   
   /** @param {CustomEvent<{ counts: number[], expected: number[] }>} event */
   function handleSyllables(event) {
     syllableCounts = event.detail.counts;
     expectedSyllables = event.detail.expected;
+    updateProgressBarTarget();
+  }
+  
+  // Update progress bar target based on current validation state
+  function updateProgressBarTarget() {
+    if (!validation.isValid || !validation.isComplete) {
+      // Calculate progress based on syllable completion
+      const totalExpected = expectedSyllables.reduce((sum, count) => sum + count, 0);
+      const totalCurrent = syllableCounts.reduce((sum, count) => sum + count, 0);
+      progressBarTarget = totalExpected > 0 ? Math.min((totalCurrent / totalExpected) * 100, 100) : 0;
+    } else {
+      // Haiku is complete
+      progressBarTarget = 100;
+    }
+  }
+  
+  // Smooth progress bar animation
+  function animateProgressBar() {
+    const diff = progressBarTarget - progressBarValue;
+    if (Math.abs(diff) < 0.1) {
+      progressBarValue = progressBarTarget;
+      return;
+    }
+    
+    // Different speeds for forward vs backward movement
+    const speed = diff > 0 ? 0.15 : 0.05; // Faster forward, slower backward
+    progressBarValue += diff * speed;
+    
+    requestAnimationFrame(animateProgressBar);
+  }
+  
+  // Start progress bar animation when target changes
+  $: if (progressBarTarget !== progressBarValue) {
+    requestAnimationFrame(animateProgressBar);
   }
   
   /** @param {CustomEvent<any>} event */
   async function handleSubmit(event) {
     if (event.detail.isComplete) {
+      // Save or update the haiku to IndexedDB
+      try {
+        const lines = content.split('\n').filter(line => line.trim());
+        const haikuData = {
+          title: title || 'Untitled Haiku',
+          lines: lines,
+          text: content,
+          tags: [], // Start with no tags, user can add them in grid view
+          status: $settingsStore.enableTaskTracking ? 'todo' : 'done'
+        };
+
+        if (isEditingHaiku && currentHaikuId) {
+          // Update existing haiku
+          await haikuStore.update(currentHaikuId, haikuData);
+          console.log('Updated existing haiku:', currentHaikuId);
+        } else {
+          // Create new haiku
+          const savedHaiku = await haikuStore.create(haikuData);
+          currentHaikuId = savedHaiku.id;
+          console.log('Created new haiku:', currentHaikuId);
+        }
+      } catch (error) {
+        console.error('Failed to save haiku:', error);
+      }
+      
       // Show success message
       showToast = true;
-      toastMessage = celebrationMessages[celebrationIndex];
+      toastMessage = isEditingHaiku ? 'Haiku updated! ✨' : celebrationMessages[celebrationIndex];
       toastType = 'success';
       
       // Trigger confetti if enabled
@@ -192,8 +353,8 @@
         });
       }
       
-      // Try to analyze the haiku if user is authenticated
-      if ($authStore.isAuthenticated && $authStore.accessToken) {
+      // Try to analyze the haiku if user is authenticated and critique is enabled
+      if ($authStore.isAuthenticated && $authStore.accessToken && $settingsStore.enableCritique) {
         try {
           isAnalyzing = true;
           showToast = true;
@@ -208,6 +369,21 @@
             showToast = true;
             toastMessage = 'Analysis complete! ✨';
             toastType = 'success';
+            
+            // Update the saved haiku with analysis results
+            if (currentHaikuId) {
+              try {
+                await haikuStore.update(currentHaikuId, {
+                  analysis: {
+                    rating: analysis.rating,
+                    commentary: analysis.comment,
+                    suggestedTags: analysis.tags
+                  }
+                });
+              } catch (error) {
+                console.error('Failed to update haiku with analysis:', error);
+              }
+            }
           } else {
             // Use fallback analysis if API fails
             analysis = result.fallback;
@@ -215,6 +391,21 @@
             showToast = true;
             toastMessage = 'Analysis failed, but your haiku is still beautiful! 🌸';
             toastType = 'warning';
+            
+            // Update the saved haiku with fallback analysis
+            if (currentHaikuId) {
+              try {
+                await haikuStore.update(currentHaikuId, {
+                  analysis: {
+                    rating: analysis.rating,
+                    commentary: analysis.comment,
+                    suggestedTags: analysis.tags
+                  }
+                });
+              } catch (error) {
+                console.error('Failed to update haiku with fallback analysis:', error);
+              }
+            }
           }
         } catch (error) {
           console.error('Analysis error:', error);
@@ -223,12 +414,20 @@
           toastType = 'error';
         } finally {
           isAnalyzing = false;
+          // Reset editing flag after analysis completes
+          isEditingHaiku = false;
         }
       }
       
       // Don't auto-reset if analysis is shown - let user manually start new haiku
       if (!showAnalysis) {
         setTimeout(() => {
+          // Clear any pending validation timeout
+          if (validationTimeout) {
+            clearTimeout(validationTimeout);
+            validationTimeout = null;
+          }
+          
           if (unifiedInputComponent) {
             unifiedInputComponent.reset();
           }
@@ -236,6 +435,7 @@
           content = '';
           syllableCounts = [];
           validation = { isValid: false, isComplete: false, feedback: '' };
+          debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
           celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
         }, 3000);
       }
@@ -278,18 +478,16 @@
     scrollToLineIndicator(event.detail.cursorLine);
   }
   
-  // Calculate progress for progressive underline
-  $: progressPercentage = (() => {
-    if (!$settingsStore.showProgressBar || !expectedSyllables.length || !syllableCounts.length) {
-      return 0;
-    }
-    
-    let totalExpected = expectedSyllables.reduce((sum, count) => sum + count, 0);
-    let totalCurrent = syllableCounts.reduce((sum, count) => sum + count, 0);
-    
-    // Cap at 100% to avoid over-progress
-    return Math.min((totalCurrent / totalExpected) * 100, 100);
-  })();
+  // Use smooth animated progress bar value
+  $: progressPercentage = $settingsStore.showProgressBar ? progressBarValue : 0;
+  
+  // Detect when content is expanding to adjust centering
+  // Trigger expansion when there's actual content being typed or analysis is shown
+  $: contentExpanding = (content.trim().length > 0 && content.includes('\n')) || 
+                       showAnalysis || 
+                       debouncedValidation.isComplete ||
+                       syllableCounts.length > 0 ||
+                       (title.trim().length > 0 && content.trim().length > 0);
   
 
 </script>
@@ -299,15 +497,16 @@
   <meta name="description" content={`Write beautiful ${poemNameLower} with real-time syllable counting`} />
 </svelte:head>
 
+<div class="main-content-wrapper {contentExpanding ? 'content-expanding' : ''}">
 <div class="container mx-auto px-4 py-4">
   <!-- Header copy -->
   <div class="text-center mb-4 animate-fade-in">
     <div class="flex items-center justify-center gap-3 mb-3 relative progress-title {$settingsStore.showProgressBar && progressPercentage > 0 ? 'show-progress' : ''}" 
          style="--progress: {progressPercentage}%">
-      <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r {validation.isValid ? 'from-green-400 to-emerald-500' : 'from-sky-400 to-blue-500'} bg-clip-text text-transparent transition-all duration-500">
-        {validation.isValid ? `It's ${poemArticle} ${poemName}!` : `Not ${poemArticle} ${poemName}`}
+      <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r {debouncedValidation.isValid ? 'from-green-400 to-emerald-500' : 'from-sky-400 to-blue-500'} bg-clip-text text-transparent transition-all duration-500">
+        {debouncedValidation.isValid ? `It's ${poemArticle} ${poemName}!` : `Not ${poemArticle} ${poemName}`}
       </h1>
-      {#if validation.isValid}
+      {#if debouncedValidation.isValid}
         <Sparkles class="w-7 h-7 sm:w-8 sm:h-8 text-success" />
       {:else}
         <Leaf class="w-7 h-7 sm:w-8 sm:h-8 text-error" />
@@ -323,7 +522,7 @@
         </div>
       {/if}
 
-      {#if content && expectedSyllables.length && !validation.isComplete}
+      {#if content && expectedSyllables.length && !debouncedValidation.isComplete}
         <div class="syllable-indicator-container"
           in:fly={{ x: 20, duration: 400, easing: cubicOut }}
           out:fly={{ x: 20, duration: 400, easing: cubicOut }}
@@ -340,7 +539,7 @@
         </div>
       {/if}
       
-      {#if validation.isComplete}
+      {#if debouncedValidation.isComplete}
         <div class="absolute inset-0 flex items-center justify-center text-xs"
           in:fly={{ x: 20, duration: 400, easing: cubicOut }}
           out:fly={{ x: -20, duration: 400, easing: cubicOut }}
@@ -359,10 +558,20 @@
         <AnalysisResults 
           {analysis}
           isVisible={showAnalysis}
+          {title}
+          {content}
         />
         
-        <!-- Start New Haiku Button -->
-        <div class="mt-6 flex justify-center">
+        <!-- Action Buttons -->
+        <div class="mt-6 flex justify-center items-center gap-4">
+          <button 
+            class="btn btn-outline btn-lg flex items-center gap-2"
+            on:click={handleEditHaiku}
+            title="Edit this haiku"
+          >
+            <Edit3 class="w-5 h-5" />
+            I can do better
+          </button>
           <button 
             class="btn btn-primary btn-lg"
             on:click={startNewHaiku}
@@ -407,6 +616,7 @@
     {/if}
   </div>
 </div>
+</div>
 
 <!-- Toast Notifications -->
 <Toast
@@ -414,6 +624,12 @@
   message={toastMessage}
   type={toastType}
   on:close={() => showToast = false}
+/>
+
+<!-- Model Error Modal -->
+<ModelErrorModal
+  bind:isOpen={showModelError}
+  error={modelError}
 />
 
 <style>
@@ -528,7 +744,7 @@
     width: var(--progress);
     background: linear-gradient(90deg, #10b981, #059669);
     border-radius: 2px;
-    transition: width 0.3s ease;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0;
   }
   
@@ -538,4 +754,69 @@
   }
   
   /* removed decorative leaves */
+  
+  /* Main content wrapper for better vertical centering */
+  .main-content-wrapper {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 0;
+    transition: padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Container that grows from center */
+  .main-content-wrapper .container {
+    width: 100%;
+    max-width: 1200px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center center;
+  }
+  
+  /* When content is expanding, keep center anchor but reduce padding */
+  .main-content-wrapper.content-expanding {
+    /* Keep center justification - this is key for center expansion */
+    justify-content: center;
+    /* Reduce padding to give more room for content while maintaining center anchor */
+    padding: 1rem 0;
+  }
+  
+  /* Add subtle scale effect for smoother expansion feeling */
+  .main-content-wrapper:not(.content-expanding) .container {
+    transform: scale(0.98);
+  }
+  
+  .main-content-wrapper.content-expanding .container {
+    transform: scale(1);
+  }
+  
+  /* Mobile adjustments - use less aggressive centering on small screens */
+  @media (max-height: 600px) {
+    .main-content-wrapper {
+      justify-content: flex-start;
+      padding: 2rem 0 1rem 0;
+    }
+    
+    .main-content-wrapper.content-expanding {
+      padding: 1rem 0;
+    }
+    
+    /* Reduce scale effect on mobile */
+    .main-content-wrapper:not(.content-expanding) .container {
+      transform: scale(1);
+    }
+  }
+  
+  /* On very small viewports, prioritize usability */
+  @media (max-height: 500px) {
+    .main-content-wrapper {
+      justify-content: flex-start;
+      padding: 1rem 0;
+    }
+    
+    .main-content-wrapper.content-expanding {
+      padding: 0.5rem 0;
+    }
+  }
 </style>

@@ -1,5 +1,5 @@
 <script>
-  import { Sparkles, Leaf } from 'lucide-svelte';
+  import { Sparkles, Leaf, Edit3 } from 'lucide-svelte';
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import UnifiedHaikuInput from '$lib/components/UnifiedHaikuInput.svelte';
@@ -73,6 +73,7 @@
   // Current haiku ID for updating with analysis
   let currentHaikuId = null;
   let isAnalyzing = false;
+  let isEditingHaiku = false;
   
   // Function to start a new haiku
   function startNewHaiku() {
@@ -93,6 +94,40 @@
     analysis = null;
     showAnalysis = false;
     currentHaikuId = null;
+    isEditingHaiku = false;
+  }
+
+  // Function to edit the current haiku
+  function handleEditHaiku() {
+    // Clear any pending validation timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+      validationTimeout = null;
+    }
+    
+    // Hide analysis and go back to input form
+    showAnalysis = false;
+    analysis = null;
+    
+    // Set editing mode
+    isEditingHaiku = true;
+    
+    // Reset validation states
+    validation = { isValid: false, isComplete: false, feedback: '' };
+    debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
+    
+    // Set the form to content step since we have content
+    if (unifiedInputComponent) {
+      unifiedInputComponent.step = 'content';
+      unifiedInputComponent.isExpanded = true;
+    }
+    
+    // Focus the textarea after a brief delay
+    setTimeout(() => {
+      if (unifiedInputComponent && unifiedInputComponent.textareaElement) {
+        unifiedInputComponent.textareaElement.focus();
+      }
+    }, 100);
   }
   
   // All available haiku templates
@@ -125,7 +160,7 @@
     {
       id: 'autocorrect-fail',
       title: '📱 autocorrect fail',
-      content: 'Ducking phone thinks it\nknows what I want to say but\nit really doesn\'t'
+      content: 'Autocorrect strikes\nChanging words I never meant\nMessages confused'
     },
     {
       id: 'procrastination',
@@ -278,24 +313,34 @@
   /** @param {CustomEvent<any>} event */
   async function handleSubmit(event) {
     if (event.detail.isComplete) {
-      // Save the haiku to IndexedDB
+      // Save or update the haiku to IndexedDB
       try {
         const lines = content.split('\n').filter(line => line.trim());
-        const savedHaiku = await haikuStore.create({
+        const haikuData = {
           title: title || 'Untitled Haiku',
           lines: lines,
           text: content,
           tags: [], // Start with no tags, user can add them in grid view
           status: $settingsStore.enableTaskTracking ? 'todo' : 'done'
-        });
-        currentHaikuId = savedHaiku.id;
+        };
+
+        if (isEditingHaiku && currentHaikuId) {
+          // Update existing haiku
+          await haikuStore.update(currentHaikuId, haikuData);
+          console.log('Updated existing haiku:', currentHaikuId);
+        } else {
+          // Create new haiku
+          const savedHaiku = await haikuStore.create(haikuData);
+          currentHaikuId = savedHaiku.id;
+          console.log('Created new haiku:', currentHaikuId);
+        }
       } catch (error) {
         console.error('Failed to save haiku:', error);
       }
       
       // Show success message
       showToast = true;
-      toastMessage = celebrationMessages[celebrationIndex];
+      toastMessage = isEditingHaiku ? 'Haiku updated! ✨' : celebrationMessages[celebrationIndex];
       toastType = 'success';
       
       // Trigger confetti if enabled
@@ -369,6 +414,8 @@
           toastType = 'error';
         } finally {
           isAnalyzing = false;
+          // Reset editing flag after analysis completes
+          isEditingHaiku = false;
         }
       }
       
@@ -511,10 +558,20 @@
         <AnalysisResults 
           {analysis}
           isVisible={showAnalysis}
+          {title}
+          {content}
         />
         
-        <!-- Start New Haiku Button -->
-        <div class="mt-6 flex justify-center">
+        <!-- Action Buttons -->
+        <div class="mt-6 flex justify-center items-center gap-4">
+          <button 
+            class="btn btn-outline btn-lg flex items-center gap-2"
+            on:click={handleEditHaiku}
+            title="Edit this haiku"
+          >
+            <Edit3 class="w-5 h-5" />
+            I can do better
+          </button>
           <button 
             class="btn btn-primary btn-lg"
             on:click={startNewHaiku}

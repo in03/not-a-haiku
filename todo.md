@@ -43,22 +43,24 @@
   - [x] Fix specific word detection errors:
     - [x] "One" incorrectly detected as two syllables
     - [x] "Clothes" consistently detected as two syllables
-- [] **Smart validation**:
-  - [ ] Prevent over-limit blocking on incomplete last words
+- [x] **Smart validation**:
+  - [x] Prevent over-limit blocking on incomplete last words
   - [x] Handle partial word input gracefully (e.g., "CL" → "CLO")
 
 ## 🎨 UI/UX Polish
 
 ### Layout & Navigation
 - [x] **Content centering** - Improve page layout balance
-- [ ] **Title management** - Enable backspace to shrink content back to title input
+- [x] **Title management** - Enable backspace to shrink content back to title input
 - [ ] **Search interface** - Create hybrid modal with integrated text input
+- [ ] **Settings sadness** - Modifying settings clears any current haiku. It would be nice to save state.
 
 ### Visual Design
 - [ ] **Tailwind UI fixes**:
   - [ ] Resolve transparency and styling issues
   - [ ] Fix blue outlines and spacing problems
   - [ ] Correct settings pane corner radius inconsistencies
+  - [ ] Toast appears over the navbar, blocking text and buttons. Display lower. Increase text contrast.
   - [x] Descenders of some letters are cut off on the lowest line.
 - [x] **Settings toggles** - Fix non-functional AI analysis and TTS toggles (ensure business logic)
 

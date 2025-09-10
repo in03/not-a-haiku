@@ -1,5 +1,5 @@
 <script>
-  import { Star, Sparkles, Brain, Tag } from 'lucide-svelte';
+  import { Star, Brain, Tag } from 'lucide-svelte';
   import { onMount } from 'svelte';
 
   /** @type {{ rating: number; comment: string; tags: string[] } | null} */
@@ -10,7 +10,6 @@
   let starsAnimated = [];
   let commentVisible = false;
   let tagsVisible = false;
-  let sparklesVisible = false;
 
   // Reset animations when analysis changes
   $: if (analysis) {
@@ -28,7 +27,6 @@
     starsAnimated = Array(5).fill(false);
     commentVisible = false;
     tagsVisible = false;
-    sparklesVisible = false;
   }
 
   async function startAnimations() {
@@ -46,10 +44,6 @@
       starsAnimated[i] = true;
       starsAnimated = [...starsAnimated]; // Trigger reactivity
     }
-    
-    // Show sparkles after stars
-    await new Promise(resolve => setTimeout(resolve, 200));
-    sparklesVisible = true;
     
     // Show comment
     await new Promise(resolve => setTimeout(resolve, 300));
@@ -108,9 +102,6 @@
     <div class="flex items-center justify-center gap-3 mb-6">
       <Brain class="w-6 h-6 text-primary" />
       <h2 class="text-2xl font-bold text-base-content">AI Analysis</h2>
-      {#if sparklesVisible}
-        <Sparkles class="w-6 h-6 text-yellow-500 animate-pulse" />
-      {/if}
     </div>
 
     <!-- Star Rating -->
@@ -126,13 +117,6 @@
         </div>
       {/each}
     </div>
-
-    <!-- Rating Text -->
-    {#if starsAnimated[Math.min(4, analysis.rating - 1)]}
-      <div class="text-lg font-semibold text-base-content/70 animate-fade-in">
-        {analysis.rating} out of 5 stars
-      </div>
-    {/if}
 
     <!-- Comment -->
     {#if commentVisible}
@@ -164,15 +148,6 @@
       </div>
     {/if}
 
-    <!-- Decorative Elements -->
-    {#if sparklesVisible}
-      <div class="absolute -top-2 -right-2 text-yellow-400 animate-pulse">
-        <Sparkles class="w-4 h-4" />
-      </div>
-      <div class="absolute -bottom-2 -left-2 text-yellow-400 animate-pulse" style="animation-delay: 500ms">
-        <Sparkles class="w-4 h-4" />
-      </div>
-    {/if}
   </div>
 {/if}
 

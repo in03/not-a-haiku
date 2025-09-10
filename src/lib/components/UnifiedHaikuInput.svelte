@@ -1178,6 +1178,7 @@
     justify-content: center;
     font-size: 18px;
     transition: all 0.2s ease;
+    z-index: 20;
   }
   
   .submit-button:hover {
@@ -1196,7 +1197,7 @@
     color: white;
     border: none;
     border-radius: 8px;
-    cursor: pointer;
+    cursor: pointer !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1206,16 +1207,24 @@
     box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     animation: submitButtonAppear 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    z-index: 20;
   }
   
   .haiku-submit-button:hover {
     background: #059669; /* Green-600 */
     transform: scale(1.05);
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    cursor: pointer !important;
   }
   
   .haiku-submit-button:active {
     transform: scale(0.98);
+    cursor: pointer !important;
+  }
+  
+  .haiku-submit-button:focus {
+    cursor: pointer !important;
   }
   
   .submit-text {

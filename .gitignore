@@ -84,10 +84,6 @@ kit-output/
 # SvelteKit temp files
 *.svelte-kit
 
-# SvelteKit lock files
-pnpm-lock.yaml
-yarn.lock
-package-lock.json
 
 # SvelteKit test coverage
 coverage/

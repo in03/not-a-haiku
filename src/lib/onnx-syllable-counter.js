@@ -19,6 +19,8 @@ let modelSession = null;
 let isModelLoaded = false;
 let isModelLoading = false;
 
+// Simple dictionary lookup is fast enough - no caching needed
+
 // Verbose logging that respects Chrome dev tools log level
 function verboseLog(...args) {
   // Use console.debug which respects Chrome's "Verbose" log level setting
@@ -59,6 +61,7 @@ async function initializeModel() {
     isModelLoading = false;
   }
 }
+
 
 /**
  * Preprocess word for ONNX model input
@@ -161,7 +164,8 @@ function extractWordsWithBoundaries(text) {
   if (words.length === 0) return [];
   
   // Determine if text ends with complete word (space/punctuation after)
-  const textEndsComplete = /[\s\p{P}]$/.test(text);
+  // Also consider a word complete if it's followed by a newline (even without space)
+  const textEndsComplete = /[\s\p{P}\n]$/.test(text);
   
   if (textEndsComplete) {
     // All words are complete
@@ -184,33 +188,27 @@ async function countWordSyllables(word, isComplete) {
   
   const startTime = performance.now();
   
-  if (isComplete) {
-    // Special rule: Single letters are treated as words (1 syllable) when complete
-    // This addresses the acronym vs word ambiguity mentioned in syllable-quirks.md
-    if (cleanWord.length === 1) {
-      verboseLog(`Single letter rule: "${cleanWord}" = 1 syllable (complete word)`);
-      return 1;
-    }
-    
-    // Complete word: Use dictionary first, ML fallback
-    const dictResult = cmuDict[cleanWord];
-    if (dictResult !== undefined) {
-      const dictTime = performance.now() - startTime;
-      verboseLog(`Dict lookup: "${cleanWord}" = ${dictResult} syllables (${dictTime.toFixed(2)}ms)`);
-      return dictResult;
-    }
-    // Unknown complete word: use ML fallback
-    const mlResult = await mlSyllableCount(cleanWord);
-    const mlTime = performance.now() - startTime;
-    verboseLog(`ML inference: "${cleanWord}" = ${mlResult} syllables (${mlTime.toFixed(2)}ms)`);
-    return mlResult;
-  } else {
-    // Partial word: Always use ML for real-time feedback
-    const mlResult = await mlSyllableCount(cleanWord);
-    const mlTime = performance.now() - startTime;
-    verboseLog(`ML inference (partial): "${cleanWord}" = ${mlResult} syllables (${mlTime.toFixed(2)}ms)`);
-    return mlResult;
+  // Special rule: Single letters are treated as words (1 syllable) when complete
+  // This addresses the acronym vs word ambiguity mentioned in syllable-quirks.md
+  if (cleanWord.length === 1 && isComplete) {
+    verboseLog(`Single letter rule: "${cleanWord}" = 1 syllable (complete word)`);
+    return 1;
   }
+  
+  // ALWAYS check dictionary first, regardless of completion status
+  const dictResult = cmuDict[cleanWord];
+  if (dictResult !== undefined) {
+    const dictTime = performance.now() - startTime;
+    verboseLog(`Dict lookup: "${cleanWord}" = ${dictResult} syllables (${dictTime.toFixed(2)}ms)`);
+    return dictResult;
+  }
+  
+  // If not in dictionary, use ML
+  const mlResult = await mlSyllableCount(cleanWord);
+  const mlTime = performance.now() - startTime;
+  verboseLog(`ML inference${isComplete ? '' : ' (partial)'}: "${cleanWord}" = ${mlResult} syllables (${mlTime.toFixed(2)}ms)`);
+  
+  return mlResult;
 }
 
 /**
@@ -313,6 +311,7 @@ export async function validateHaiku(content, expectedSyllables = [5, 7, 5], poem
     feedback
   };
 }
+
 
 /**
  * Initialize the model on module load

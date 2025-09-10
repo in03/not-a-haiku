@@ -14,6 +14,11 @@
   // Track validation state for submit button
   let validation = { isValid: false, isComplete: false, feedback: '' };
   
+  // Debounced validation state for UI elements (300ms delay)
+  let debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let validationTimeout = null;
+  
   /** @type {typeof defaultSettings} */
   let settings = defaultSettings;
   let step = 'title'; // 'title' or 'content'
@@ -91,6 +96,20 @@
     }
   }
   
+  // Update debounced validation for UI elements (300ms delay)
+  /** @param {{ isValid: boolean, isComplete: boolean, feedback: string }} newValidation */
+  function updateDebouncedValidation(newValidation) {
+    // Clear existing timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+    }
+    
+    // Debounce validation updates for UI (300ms delay)
+    validationTimeout = setTimeout(() => {
+      debouncedValidation = { ...newValidation };
+    }, 300);
+  }
+
   // Handle haiku submission
   function handleHaikuSubmit() {
     if (validation.isValid && validation.isComplete) {
@@ -487,10 +506,15 @@
       const overall = await validateHaiku(text, expectedSyllables, currentPoemType.name);
       validation = overall; // Store for submit button state
       dispatch('validation', overall);
+      
+      // Update debounced validation for UI elements
+      updateDebouncedValidation(overall);
     } catch (error) {
       console.error('Syllable counting error:', error);
       syllableCounts = new Array(maxLines).fill(0);
-      dispatch('validation', { isValid: false, isComplete: false, feedback: '' });
+      const errorValidation = { isValid: false, isComplete: false, feedback: '' };
+      dispatch('validation', errorValidation);
+      updateDebouncedValidation(errorValidation);
     }
   }
   
@@ -523,13 +547,18 @@
       validation = validationResult; // Store for submit button state
       dispatch('validation', validationResult);
       
+      // Update debounced validation for UI elements
+      updateDebouncedValidation(validationResult);
+      
       // Store the text for this validation to avoid duplicate validations
       lastWordSubmissionValidation = text;
       
     } catch (error) {
       console.error('Validation error:', error);
-      validation = { isValid: false, isComplete: false, feedback: 'Validation error' };
-      dispatch('validation', validation);
+      const errorValidation = { isValid: false, isComplete: false, feedback: 'Validation error' };
+      validation = errorValidation;
+      dispatch('validation', errorValidation);
+      updateDebouncedValidation(errorValidation);
     }
   }
   
@@ -808,17 +837,14 @@
   }
   
   // Update content and trigger validation
+  /** @param {string} newContent */
   export function updateContent(newContent) {
     content = newContent;
     isExpanded = true;
     step = 'content';
     
-    // Trigger syllable counting and validation
-    tick().then(() => {
-      if (textareaElement) {
-        handleInput({ target: textareaElement });
-      }
-    });
+    // The reactive statement will automatically handle syllable counting and validation
+    // when content changes, so no need to manually trigger it
   }
   
   // Note: Syllable counter initialization is handled by the parent component
@@ -923,7 +949,7 @@
       </div>
       
       <!-- Submit button for completed haiku -->
-      {#if validation.isValid && validation.isComplete}
+      {#if debouncedValidation.isValid && debouncedValidation.isComplete}
         <button 
           class="haiku-submit-button"
           on:click={handleHaikuSubmit}

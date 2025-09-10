@@ -44,6 +44,13 @@
   let syllableCounts = [];
   /** @type {number[]} */
   let expectedSyllables = [];
+  
+  // Debounced UI state for smoother animations
+  let debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let validationTimeout = null;
+  let progressBarValue = 0;
+  let progressBarTarget = 0;
   let showToast = false;
   let toastMessage = '';
   let toastType = 'info';
@@ -196,16 +203,64 @@
     const previousValid = validation.isValid;
     validation = event.detail;
     
-    // Cycle celebration message when haiku becomes valid
-    if (!previousValid && validation.isValid) {
-      celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
+    // Clear existing timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
     }
+    
+    // Debounce validation updates for UI (300ms delay)
+    validationTimeout = setTimeout(() => {
+      const previousDebouncedValid = debouncedValidation.isValid;
+      debouncedValidation = { ...validation };
+      
+      // Cycle celebration message when haiku becomes valid
+      if (!previousDebouncedValid && debouncedValidation.isValid) {
+        celebrationIndex = (celebrationIndex + 1) % celebrationMessages.length;
+      }
+    }, 300);
+    
+    // Update progress bar target immediately for smooth animation
+    updateProgressBarTarget();
   }
   
   /** @param {CustomEvent<{ counts: number[], expected: number[] }>} event */
   function handleSyllables(event) {
     syllableCounts = event.detail.counts;
     expectedSyllables = event.detail.expected;
+    updateProgressBarTarget();
+  }
+  
+  // Update progress bar target based on current validation state
+  function updateProgressBarTarget() {
+    if (!validation.isValid || !validation.isComplete) {
+      // Calculate progress based on syllable completion
+      const totalExpected = expectedSyllables.reduce((sum, count) => sum + count, 0);
+      const totalCurrent = syllableCounts.reduce((sum, count) => sum + count, 0);
+      progressBarTarget = totalExpected > 0 ? Math.min((totalCurrent / totalExpected) * 100, 100) : 0;
+    } else {
+      // Haiku is complete
+      progressBarTarget = 100;
+    }
+  }
+  
+  // Smooth progress bar animation
+  function animateProgressBar() {
+    const diff = progressBarTarget - progressBarValue;
+    if (Math.abs(diff) < 0.1) {
+      progressBarValue = progressBarTarget;
+      return;
+    }
+    
+    // Different speeds for forward vs backward movement
+    const speed = diff > 0 ? 0.15 : 0.05; // Faster forward, slower backward
+    progressBarValue += diff * speed;
+    
+    requestAnimationFrame(animateProgressBar);
+  }
+  
+  // Start progress bar animation when target changes
+  $: if (progressBarTarget !== progressBarValue) {
+    requestAnimationFrame(animateProgressBar);
   }
   
   /** @param {CustomEvent<any>} event */
@@ -357,24 +412,14 @@
     scrollToLineIndicator(event.detail.cursorLine);
   }
   
-  // Calculate progress for progressive underline
-  $: progressPercentage = (() => {
-    if (!$settingsStore.showProgressBar || !expectedSyllables.length || !syllableCounts.length) {
-      return 0;
-    }
-    
-    let totalExpected = expectedSyllables.reduce((sum, count) => sum + count, 0);
-    let totalCurrent = syllableCounts.reduce((sum, count) => sum + count, 0);
-    
-    // Cap at 100% to avoid over-progress
-    return Math.min((totalCurrent / totalExpected) * 100, 100);
-  })();
+  // Use smooth animated progress bar value
+  $: progressPercentage = $settingsStore.showProgressBar ? progressBarValue : 0;
   
   // Detect when content is expanding to adjust centering
   // Trigger expansion when there's actual content being typed or analysis is shown
   $: contentExpanding = (content.trim().length > 0 && content.includes('\n')) || 
                        showAnalysis || 
-                       validation.isComplete ||
+                       debouncedValidation.isComplete ||
                        syllableCounts.length > 0 ||
                        (title.trim().length > 0 && content.trim().length > 0);
   
@@ -392,10 +437,10 @@
   <div class="text-center mb-4 animate-fade-in">
     <div class="flex items-center justify-center gap-3 mb-3 relative progress-title {$settingsStore.showProgressBar && progressPercentage > 0 ? 'show-progress' : ''}" 
          style="--progress: {progressPercentage}%">
-      <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r {validation.isValid ? 'from-green-400 to-emerald-500' : 'from-sky-400 to-blue-500'} bg-clip-text text-transparent transition-all duration-500">
-        {validation.isValid ? `It's ${poemArticle} ${poemName}!` : `Not ${poemArticle} ${poemName}`}
+      <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r {debouncedValidation.isValid ? 'from-green-400 to-emerald-500' : 'from-sky-400 to-blue-500'} bg-clip-text text-transparent transition-all duration-500">
+        {debouncedValidation.isValid ? `It's ${poemArticle} ${poemName}!` : `Not ${poemArticle} ${poemName}`}
       </h1>
-      {#if validation.isValid}
+      {#if debouncedValidation.isValid}
         <Sparkles class="w-7 h-7 sm:w-8 sm:h-8 text-success" />
       {:else}
         <Leaf class="w-7 h-7 sm:w-8 sm:h-8 text-error" />
@@ -411,7 +456,7 @@
         </div>
       {/if}
 
-      {#if content && expectedSyllables.length && !validation.isComplete}
+      {#if content && expectedSyllables.length && !debouncedValidation.isComplete}
         <div class="syllable-indicator-container"
           in:fly={{ x: 20, duration: 400, easing: cubicOut }}
           out:fly={{ x: 20, duration: 400, easing: cubicOut }}
@@ -428,7 +473,7 @@
         </div>
       {/if}
       
-      {#if validation.isComplete}
+      {#if debouncedValidation.isComplete}
         <div class="absolute inset-0 flex items-center justify-center text-xs"
           in:fly={{ x: 20, duration: 400, easing: cubicOut }}
           out:fly={{ x: -20, duration: 400, easing: cubicOut }}
@@ -623,7 +668,7 @@
     width: var(--progress);
     background: linear-gradient(90deg, #10b981, #059669);
     border-radius: 2px;
-    transition: width 0.3s ease;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0;
   }
   

@@ -20,17 +20,17 @@
 
 ### AI Analysis System
 - [ ] **Rating system overhaul**:
-  - [ ] Replace "5 out of 5 stars" text with visual star icons (grayed out for missing stars)
+  - [x] Replace "5 out of 5 stars" text with visual star icons (grayed out for missing stars)
   - [ ] Integrate AI-generated encouragement messages ("You're a natural", "Great job") based on content quality
   - [ ] Implement consistent rating criteria for more reliable results
   - [ ] Detect and penalize derivative content (1 star for exact duplicates)
 - [ ] **Tag management**:
-  - [ ] Rename "task categories" to "categories" for broader applicability
+  - [x] Rename "task categories" to "categories" for broader applicability
   - [ ] Add user tag management (+ button for adding, x button for removing)
   - [ ] Prioritize existing tags in AI suggestions before creating new ones
 - [ ] **User experience**:
-  - [ ] Remove distracting animated sparkles
-  - [ ] Add edit button for resubmission after poor reviews
+  - [x] Remove distracting animated sparkles
+  - [x] Add edit button for resubmission after poor reviews
 
 ### Audio & Voice
 - [ ] **Text-to-Speech improvements**:
@@ -52,7 +52,9 @@
 ### Layout & Navigation
 - [x] **Content centering** - Improve page layout balance
 - [x] **Title management** - Enable backspace to shrink content back to title input
-- [ ] **Search interface** - Create hybrid modal with integrated text input
+  - [ ] Note on this, when selecting all text and hitting backspace, this also triggers title input editing. It should not.
+- [ ] **Sticky validation state** - After adding debounced validation, the progress bar does not reset post-submission.
+- [ ] **Search interface** - Create hybrid modal with integrated text input, probably kill the bar.
 - [ ] **Settings sadness** - Modifying settings clears any current haiku. It would be nice to save state.
 
 ### Visual Design

@@ -1277,7 +1277,7 @@
     color: var(--text-secondary, #9ca3af);
     transition: all 0.3s ease;
     z-index: 10;
-    opacity: 0.6;
+    opacity: 0.8;
   }
   
   .tts-button:hover {
@@ -1295,7 +1295,7 @@
     color: var(--text-secondary, #9ca3af);
     transform: none;
     box-shadow: none;
-    opacity: 0.4;
+    opacity: 0.6;
     cursor: help;
   }
   
@@ -1481,7 +1481,7 @@
       color: var(--text-secondary, #6b7280);
       box-shadow: none;
       transform: none;
-      opacity: 0.4;
+      opacity: 0.6;
     }
   }
 </style>

@@ -394,6 +394,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    backdrop-filter: blur(10px);
   }
 
   .grid-view-header {
@@ -415,12 +416,12 @@
     margin: 0;
     font-size: 20px;
     font-weight: 600;
-    color: oklch(var(--bc));
+    color: var(--text-primary);
   }
 
   .haiku-count {
-    background: oklch(var(--b3));
-    color: oklch(var(--bc) / 0.7);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
     padding: 4px 8px;
     border-radius: 6px;
     font-size: 12px;
@@ -438,10 +439,10 @@
     align-items: center;
     gap: 6px;
     padding: 8px 12px;
-    background: hsl(var(--b1));
-    border: 1px solid hsl(var(--b3));
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
-    color: hsl(var(--bc) / 0.7);
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
     font-size: 14px;
@@ -449,30 +450,30 @@
 
   .filter-toggle:hover,
   .filter-toggle.active {
-    background: hsl(var(--b2));
-    border-color: hsl(var(--bc) / 0.3);
-    color: hsl(var(--bc));
+    background: var(--bg-secondary);
+    border-color: var(--border-focus);
+    color: var(--text-primary);
   }
 
   .close-button {
     padding: 8px;
     background: none;
     border: none;
-    color: hsl(var(--bc) / 0.7);
+    color: var(--text-secondary);
     cursor: pointer;
     border-radius: 6px;
     transition: all 0.2s ease;
   }
 
   .close-button:hover {
-    background: hsl(var(--b3));
-    color: hsl(var(--bc));
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
   }
 
   .filters-section {
     padding: 16px 24px;
-    border-bottom: 1px solid oklch(var(--b3));
-    background: oklch(var(--b2));
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
   }
 
   .filter-row {
@@ -500,7 +501,7 @@
   .filter-label {
     font-size: 12px;
     font-weight: 500;
-    color: hsl(var(--bc) / 0.7);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
@@ -533,7 +534,7 @@
     transform: translateY(-50%);
     width: 16px;
     height: 16px;
-    background: oklch(var(--bc) / 0.6);
+    background: var(--text-secondary);
     mask: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'%3e%3cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3e%3c/svg%3e") no-repeat center;
     mask-size: contain;
     -webkit-mask: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'%3e%3cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3e%3c/svg%3e") no-repeat center;
@@ -550,6 +551,7 @@
   .filter-select:focus {
     outline: none;
     border-color: var(--border-focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--border-focus) 15%, transparent);
   }
 
   /* Style the dropdown options */
@@ -566,17 +568,17 @@
 
   .sort-order-button {
     padding: 8px;
-    background: hsl(var(--b1));
-    border: 1px solid hsl(var(--b3));
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
-    color: hsl(var(--bc) / 0.7);
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
   }
 
   .sort-order-button:hover {
-    background: hsl(var(--b2));
-    color: hsl(var(--bc));
+    background: var(--bg-secondary);
+    color: var(--text-primary);
   }
 
   .tag-filters {
@@ -587,41 +589,41 @@
 
   .tag-filter {
     padding: 4px 8px;
-    background: hsl(var(--b1));
-    border: 1px solid hsl(var(--b3));
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
-    color: hsl(var(--bc) / 0.7);
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
     font-size: 12px;
   }
 
   .tag-filter:hover {
-    background: hsl(var(--b2));
-    color: hsl(var(--bc));
+    background: var(--bg-secondary);
+    color: var(--text-primary);
   }
 
   .tag-filter.active {
-    background: hsl(var(--p));
-    border-color: hsl(var(--p));
-    color: hsl(var(--pc));
+    background: var(--border-focus);
+    border-color: var(--border-focus);
+    color: white;
   }
 
   .clear-filters {
     padding: 6px 12px;
     background: none;
-    border: 1px solid hsl(var(--b3));
+    border: 1px solid var(--border-color);
     border-radius: 6px;
-    color: hsl(var(--bc) / 0.7);
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
     font-size: 12px;
   }
 
   .clear-filters:hover {
-    background: hsl(var(--er) / 0.1);
-    border-color: hsl(var(--er) / 0.3);
-    color: hsl(var(--er));
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #dc2626;
   }
 
   .grid-view-content {
@@ -648,12 +650,12 @@
     margin: 0 0 8px 0;
     font-size: 18px;
     font-weight: 600;
-    color: hsl(var(--bc));
+    color: var(--text-primary);
   }
 
   .empty-state p {
     margin: 0;
-    color: hsl(var(--bc) / 0.7);
+    color: var(--text-secondary);
     line-height: 1.5;
   }
 
@@ -664,8 +666,8 @@
   }
 
   .haiku-card {
-    background: oklch(var(--b1));
-    border: 1px solid oklch(var(--b3));
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     overflow: hidden;
     transition: all 0.2s ease;
@@ -674,8 +676,8 @@
 
   .haiku-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border-color: oklch(var(--bc) / 0.3);
+    box-shadow: 0 4px 12px var(--card-shadow);
+    border-color: var(--border-focus);
   }
 
   .haiku-card-header {
@@ -733,7 +735,7 @@
     margin: 0;
     font-size: 16px;
     font-weight: 600;
-    color: oklch(var(--bc));
+    color: var(--text-primary);
     text-overflow: ellipsis;
     overflow: hidden;
     white-space: nowrap;
@@ -747,25 +749,25 @@
     padding: 4px;
     background: none;
     border: none;
-    color: hsl(var(--bc) / 0.6);
+    color: var(--text-secondary);
     cursor: pointer;
     border-radius: 4px;
     transition: all 0.2s ease;
   }
 
   .haiku-menu-button:hover {
-    background: hsl(var(--b2));
-    color: hsl(var(--bc) / 0.8);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
   }
 
   .haiku-menu-dropdown {
     position: absolute;
     top: 100%;
     right: 0;
-    background: hsl(var(--b1));
-    border: 1px solid hsl(var(--b3));
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px var(--card-shadow);
     z-index: 10;
     min-width: 120px;
     opacity: 0;
@@ -789,22 +791,22 @@
     background: none;
     border: none;
     text-align: left;
-    color: hsl(var(--bc));
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s ease;
     font-size: 14px;
   }
 
   .menu-item:hover {
-    background: hsl(var(--b2));
+    background: var(--bg-secondary);
   }
 
   .menu-item.danger {
-    color: hsl(var(--er));
+    color: #dc2626;
   }
 
   .menu-item.danger:hover {
-    background: hsl(var(--er) / 0.1);
+    background: #fef2f2;
   }
 
   .haiku-content {
@@ -813,7 +815,7 @@
   }
 
   .haiku-line {
-    color: oklch(var(--bc));
+    color: var(--text-primary);
     line-height: 1.6;
     margin-bottom: 4px;
     font-size: 15px;
@@ -846,8 +848,8 @@
 
   .haiku-tag {
     padding: 2px 6px;
-    background: hsl(var(--b3));
-    color: hsl(var(--bc) / 0.8);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
     font-size: 11px;
     border-radius: 4px;
   }
@@ -880,7 +882,7 @@
 
   .haiku-date {
     font-size: 12px;
-    color: hsl(var(--bc) / 0.6);
+    color: var(--text-tertiary);
   }
 
   .haiku-status {

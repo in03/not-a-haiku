@@ -39,6 +39,16 @@
   onDestroy(() => unsubscribe());
 </script>
 
+<style>
+  .settings-page-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 25px 50px var(--card-shadow);
+    overflow: hidden;
+  }
+</style>
+
 <section class="min-h-screen bg-base-100">
   <div class="container mx-auto px-4 py-6">
     <!-- Constrain content width for better readability -->
@@ -52,10 +62,8 @@
         </div>
         {#if saved}<span class="badge badge-success badge-outline">Saved</span>{/if}
       </div>
-      <div class="card bg-base-100 shadow-lg border border-base-300">
-        <div class="card-body p-0">
-          <Settings isModal={false} bind:settings on:close={handleClose} />
-        </div>
+      <div class="settings-page-card">
+        <Settings isModal={false} bind:settings on:close={handleClose} />
       </div>
     </div>
   </div>

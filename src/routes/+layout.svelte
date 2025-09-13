@@ -587,7 +587,7 @@
     position: relative;
     display: flex;
     align-items: center;
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     transition: all 0.2s ease;
@@ -596,6 +596,7 @@
   .search-input-wrapper:focus-within {
     background: var(--bg-primary);
     border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-focus) 15%, transparent);
   }
 
   .search-icon {
@@ -665,6 +666,7 @@
     z-index: 1000;
     max-height: 400px;
     overflow-y: auto;
+    backdrop-filter: blur(10px);
   }
 
   .search-results-header {

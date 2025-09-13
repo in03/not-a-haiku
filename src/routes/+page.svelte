@@ -374,6 +374,7 @@
             if (currentHaikuId) {
               try {
                 await haikuStore.update(currentHaikuId, {
+                  tags: analysis.tags, // Copy suggested tags to main tags field
                   analysis: {
                     rating: analysis.rating,
                     commentary: analysis.comment,
@@ -396,6 +397,7 @@
             if (currentHaikuId) {
               try {
                 await haikuStore.update(currentHaikuId, {
+                  tags: analysis.tags, // Copy suggested tags to main tags field
                   analysis: {
                     rating: analysis.rating,
                     commentary: analysis.comment,

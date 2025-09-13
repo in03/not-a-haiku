@@ -49,7 +49,7 @@
 </script>
 
 {#if show}
-  <div class="fixed top-20 right-4 z-30 animate-scale-in">
+  <div class="fixed top-20 right-4 animate-scale-in" style="z-index: 99999;">
     <div class="alert shadow-lg {styles[type]} bg-white dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600">
       {#if type === 'success'}
         <CheckCircle class="w-5 h-5 {iconStyles.success}" />

@@ -6,15 +6,17 @@
 - [ ] **Social sharing functionality** - Enable users to share their haikus across platforms
 - [ ] **Export functionality** - Simple ways to export haikus for external use
 - [ ] **AI-generated haiku images** - Generate beautiful backgrounds and typography for visual sharing
-- [ ] **GitHub "for the love of code" badge** - Register and display project badge
+- [ ] **GitHub "for the love of code" badge** - Register and display project badge in Readme
+- [ ] **GitHub "for the love of code" badge** - Display FTLOC badge/hashtag in footer.
 
 ### Content Management & Discovery
-- [ ] **Enhanced grid view** - Transform into a powerful content management system with:
-  - [ ] Advanced search and filtering capabilities
-  - [ ] Edit and delete functionality
-  - [ ] Modal view for longer content (etherees)
-  - [ ] Direct editor integration from grid view
-- [ ] **Unified search experience** - Consolidate search bar and Ctrl+K functionality into a single, intuitive modal interface
+- [x] **Enhanced grid view** - Make into a better content management system
+  - [x] Advanced search and filtering capabilities
+  - [x] Edit and delete functionality
+  - [x] Modal view for longer content (etherees)
+  - [x] Direct editor integration from grid view
+  - [ ] Fix task checkbox toggle not updating visually in grid view
+- [x] **Unified search experience** - Consolidate search bar and Ctrl+K functionality into a single, intuitive modal interface
 
 ## 🔧 Technical Improvements
 
@@ -49,20 +51,28 @@
 
 ## 🎨 UI/UX Polish
 
+### Onboarding
+- [ ] - Add a dismissable onboarding prompt for new users. Make it punchy, short, but flashy. Suggest sign in to GitHub for AI analysis and syncing benefits
+
 ### Layout & Navigation
 - [x] **Content centering** - Improve page layout balance
 - [x] **Title management** - Enable backspace to shrink content back to title input
   - [ ] Note on this, when selecting all text and hitting backspace, this also triggers title input editing. It should not.
 - [ ] **Sticky validation state** - After adding debounced validation, the progress bar does not reset post-submission.
-- [ ] **Search interface** - Create hybrid modal with integrated text input, probably kill the bar.
+- [x] **Search interface** - Create hybrid modal with integrated text input, probably kill the bar.
 - [ ] **Settings sadness** - Modifying settings clears any current haiku. It would be nice to save state.
+- [ ] **Viewer Modal** - Implement viewer modal for viewing editing actions on grid items
+  - [x] Editable tags (removable)
+  - [ ] Add additional tags (search, create new)
+  - [x] Edit, delete buttons
+  - [x] Add delete button 
 
 ### Visual Design
-- [ ] **Tailwind UI fixes**:
-  - [ ] Resolve transparency and styling issues
-  - [ ] Fix blue outlines and spacing problems
-  - [ ] Correct settings pane corner radius inconsistencies
-  - [ ] Toast appears over the navbar, blocking text and buttons. Display lower. Increase text contrast.
+- [x] **Tailwind UI fixes**:
+  - [x] Resolve transparency and styling issues
+  - [x] Fix blue outlines and spacing problems
+  - [x] Correct settings pane corner radius inconsistencies
+  - [x] Toast appears over the navbar, blocking text and buttons. Display lower. Increase text contrast.
   - [x] Descenders of some letters are cut off on the lowest line.
 - [x] **Settings toggles** - Fix non-functional AI analysis and TTS toggles (ensure business logic)
 
@@ -72,6 +82,8 @@
 
 ### Mobile
 - [ ] Autocomplete seems to cause counting and validation issues.
+- [ ] Responsiveness issues
+ - [ ] Worst for the grid view modal atm
 
 ## 🔄 System Integration
 

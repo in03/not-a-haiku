@@ -119,6 +119,11 @@
     border: 1px solid color-mix(in srgb, #3b82f6 25%, transparent);
   }
 
+  /* Ensure confetti appears above all modals */
+  canvas[style*="position: fixed"] {
+    z-index: 99999 !important;
+  }
+
   /* Native replacements for former DaisyUI utilities */
   /* Buttons */
   .btn { @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-150 select-none; }

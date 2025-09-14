@@ -1,20 +1,33 @@
 import { json } from '@sveltejs/kit';
 import { GITHUB_CLIENT_ID } from '$lib/auth/github.js';
-import { GITHUB_CLIENT_SECRET } from '$env/static/private';
+import { OAUTH_CLIENT_SECRET } from '$env/static/private';
 
 // GitHub OAuth client secret from environment variables
-// const GITHUB_CLIENT_SECRET = import.meta.env.GITHUB_CLIENT_SECRET; // This doesn't work in SvelteKit server routes
+// Note: Using OAUTH_CLIENT_SECRET instead of GITHUB_CLIENT_SECRET due to GitHub's protected keyword restriction
+// const OAUTH_CLIENT_SECRET = import.meta.env.OAUTH_CLIENT_SECRET; // This doesn't work in SvelteKit server routes
 
-// Validate required environment variables
-if (!GITHUB_CLIENT_SECRET) {
-  console.error('❌ GITHUB_CLIENT_SECRET not set - OAuth token exchange will fail');
+// Environment detection (server-side)
+const isDevelopment = process.env.NODE_ENV === 'development';
+const isProduction = process.env.NODE_ENV === 'production';
+const environment = process.env.NODE_ENV || 'development';
+
+// Validate required environment variables with environment context
+if (!OAUTH_CLIENT_SECRET) {
+  console.error(`❌ OAUTH_CLIENT_SECRET not set for ${environment} - OAuth token exchange will fail`);
+  console.error(isDevelopment 
+    ? '💡 Add OAUTH_CLIENT_SECRET to your .env.local file' 
+    : '💡 Set OAUTH_CLIENT_SECRET in your deployment platform environment variables');
 } else {
-  console.log('✅ GITHUB_CLIENT_SECRET is set');
+  console.log(`✅ OAUTH_CLIENT_SECRET is set for ${environment}`);
 }
+
 if (!GITHUB_CLIENT_ID) {
-  console.error('❌ GITHUB_CLIENT_ID not set - OAuth will fail');
+  console.error(`❌ VITE_OAUTH_CLIENT_ID not set for ${environment} - OAuth will fail`);
+  console.error(isDevelopment 
+    ? '💡 Add VITE_OAUTH_CLIENT_ID to your .env.local file' 
+    : '💡 Set VITE_OAUTH_CLIENT_ID in your deployment platform environment variables');
 } else {
-  console.log('✅ GITHUB_CLIENT_ID is set:', GITHUB_CLIENT_ID);
+  console.log(`✅ VITE_OAUTH_CLIENT_ID is set for ${environment}:`, GITHUB_CLIENT_ID);
 }
 
 /**
@@ -37,7 +50,7 @@ export async function POST({ request, cookies }) {
     // Exchange code for access token
     const tokenPayload = {
       client_id: GITHUB_CLIENT_ID,
-      client_secret: GITHUB_CLIENT_SECRET,
+      client_secret: OAUTH_CLIENT_SECRET,
       code: code
     };
     

@@ -2,16 +2,39 @@
  * GitHub OAuth utilities for authentication with GitHub Models API
  */
 
-// OAuth configuration from environment variables
-export const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
-export const REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI;
+// Environment detection
+const isDevelopment = import.meta.env.DEV;
+const isProduction = import.meta.env.PROD;
 
-// Validate required environment variables
+// OAuth configuration from environment variables
+// Note: Using VITE_OAUTH prefix instead of VITE_GITHUB due to GitHub's protected keyword restriction
+export const GITHUB_CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID;
+export const REDIRECT_URI = import.meta.env.VITE_OAUTH_REDIRECT_URI;
+
+// Environment-specific configuration
+const config = {
+  development: {
+    scopes: 'read:user gist', // Minimal scopes for development
+    allowSignup: 'true'
+  },
+  production: {
+    scopes: 'read:user gist', // Production scopes - adjust as needed
+    allowSignup: 'true'
+  }
+};
+
+export const oauthConfig = isDevelopment ? config.development : config.production;
+
+// Validate required environment variables with environment context
 if (!GITHUB_CLIENT_ID) {
-  console.warn('⚠️  VITE_GITHUB_CLIENT_ID not set - GitHub OAuth will not work');
+  const envType = isDevelopment ? 'development' : 'production';
+  console.warn(`⚠️  VITE_OAUTH_CLIENT_ID not set for ${envType} - GitHub OAuth will not work`);
+  console.warn(`💡 ${isDevelopment ? 'Create a development OAuth app and add to .env.local' : 'Set production OAuth app ID in deployment platform'}`);
 }
 if (!REDIRECT_URI) {
-  console.warn('⚠️  VITE_GITHUB_REDIRECT_URI not set - GitHub OAuth will not work');
+  const envType = isDevelopment ? 'development' : 'production';
+  console.warn(`⚠️  VITE_OAUTH_REDIRECT_URI not set for ${envType} - GitHub OAuth will not work`);
+  console.warn(`💡 ${isDevelopment ? 'Set to your Tailscale tunnel URL or localhost:5173' : 'Set to your production domain'}`);
 }
 
 /**
@@ -21,18 +44,18 @@ if (!REDIRECT_URI) {
  */
 export function getGitHubAuthUrl(state) {
   if (!GITHUB_CLIENT_ID) {
-    throw new Error('VITE_GITHUB_CLIENT_ID is not set');
+    throw new Error('VITE_OAUTH_CLIENT_ID is not set');
   }
   if (!REDIRECT_URI) {
-    throw new Error('VITE_GITHUB_REDIRECT_URI is not set');
+    throw new Error('VITE_OAUTH_REDIRECT_URI is not set');
   }
   
   const params = new URLSearchParams({
     client_id: GITHUB_CLIENT_ID,
     redirect_uri: REDIRECT_URI,
-    scope: 'read:user gist', // read:user for GitHub Models, gist for creating/managing gists
+    scope: oauthConfig.scopes, // Environment-specific scopes
     state: state,
-    allow_signup: 'true'
+    allow_signup: oauthConfig.allowSignup
   });
   
   return `https://github.com/login/oauth/authorize?${params.toString()}`;

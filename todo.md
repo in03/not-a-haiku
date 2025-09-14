@@ -58,7 +58,7 @@
 - [x] **Content centering** - Improve page layout balance
 - [x] **Title management** - Enable backspace to shrink content back to title input
   - [x] Note on this, when selecting all text and hitting backspace, this also triggers title input editing. It should not.
-- [ ] **Sticky validation state** - After adding debounced validation, the progress bar does not reset post-submission.
+- [x] **Sticky validation state** - After adding debounced validation, the progress bar does not reset post-submission.
 - [x] **Search interface** - Create hybrid modal with integrated text input, probably kill the bar.
 - [ ] **Settings sadness** - Modifying settings clears any current haiku. It would be nice to save state.
 - [ ] **Viewer Modal** - Implement viewer modal for viewing editing actions on grid items
@@ -82,11 +82,12 @@
 
 ### Mobile
 - [ ] Autocomplete seems to cause counting and validation issues.
+- [ ] Auto newline not triggering on mobile devices. 
 - [x] Responsiveness issues
  - [x] Worst for the grid view modal atm
 
 ## 🔄 System Integration
 
 ### Data Management
-- [ ] **GitHub sync** - Resolve synchronization issues
+- [x] **GitHub sync** - Resolve synchronization issues
 - [x] **Task status management** - Implement task status change functionality

@@ -11,11 +11,11 @@
   export let isModal = true; // New prop to control modal vs inline behavior
   // @ts-ignore - allow shape extension from store
   export let settings = {
-    autoBackspace: false,
+    autoBackspace: true,
     enableShake: true,
     enableConfetti: true,
     poemType: 'haiku',
-    showProgressBar: false,
+    showProgressBar: true,
     elevenlabsApiKey: '',
     ttsPauseDuration: 1.0,
     enableTaskTracking: false,
@@ -131,23 +131,25 @@
   {#if isOpen}
     <div class="settings-overlay" role="button" tabindex="0" on:click={handleClose} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleClose()}>
       <div class="settings-modal" role="dialog" aria-modal="true" tabindex="0" on:keydown={(e) => e.key === 'Escape' && handleClose()} on:click|stopPropagation>
-        <div class="settings-header">
-          <h2 id="settings-title">Settings</h2>
-          <button class="close-button" on:click={handleClose} aria-label="Close settings">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-        
-        <div class="settings-content">
-          <!-- Modal content here -->
-        </div>
-        
-        <div class="settings-footer">
-          <button class="cancel-button" on:click={handleClose}>Cancel</button>
-          <button class="save-button" on:click={handleSave}>Save Settings</button>
+        <div class="settings-content-wrapper">
+          <div class="settings-header">
+            <h2 id="settings-title">Settings</h2>
+            <button class="close-button" on:click={handleClose} aria-label="Close settings">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          
+          <div class="settings-content">
+            <!-- Modal content here -->
+          </div>
+          
+          <div class="settings-footer">
+            <button class="cancel-button" on:click={handleClose}>Cancel</button>
+            <button class="save-button" on:click={handleSave}>Save Settings</button>
+          </div>
         </div>
       </div>
     </div>
@@ -619,7 +621,7 @@
   
   .settings-modal {
     background: var(--bg-primary);
-    border-radius: 16px;
+    border-radius: 12px;
     box-shadow: 0 25px 50px -12px var(--card-shadow);
     max-width: 500px;
     width: 100%;
@@ -630,10 +632,11 @@
     position: relative;
   }
   
-  .settings-content-wrapper {
-    border-radius: inherit;
+  .settings-modal > .settings-content-wrapper {
+    border-radius: 12px;
     overflow: hidden;
   }
+  
   
   .settings-header {
     display: flex;
@@ -656,7 +659,7 @@
     border: none;
     cursor: pointer;
     padding: 8px;
-    border-radius: 6px;
+    border-radius: 8px;
     color: var(--text-secondary);
     transition: all 0.2s;
   }
@@ -673,13 +676,18 @@
     box-sizing: border-box;
     background: var(--bg-primary);
     color: var(--text-primary);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
   }
 
   /* Tab Navigation */
   .tab-navigation {
     display: flex;
     border-bottom: 1px solid var(--border-color);
-    background: var(--bg-secondary);
+    background: transparent;
     overflow-x: auto;
   }
 
@@ -712,6 +720,7 @@
     width: 100%;
     padding: 24px;
     padding-bottom: 16px;
+    background: var(--bg-primary);
   }
   
   .setting-group {
@@ -758,7 +767,7 @@
   .poem-type-trigger:focus {
     outline: none;
     border-color: var(--border-focus);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-focus) 20%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-focus) 15%, transparent);
   }
   
   .poem-type-current {
@@ -794,7 +803,7 @@
   @keyframes expandIn {
     from {
       opacity: 0;
-      transform: translateY(-10px);
+      transform: translateY(-5px);
     }
     to {
       opacity: 1;
@@ -815,7 +824,6 @@
   
   .poem-type-option:hover {
     border-color: var(--border-focus);
-    transform: translateY(-1px);
     box-shadow: 0 2px 8px var(--card-shadow);
   }
   
@@ -861,7 +869,7 @@
   }
 
   .toggle-label.disabled {
-    opacity: 0.6;
+    opacity: 0.7;
     cursor: not-allowed;
   }
   
@@ -903,7 +911,7 @@
 
   .toggle-input:disabled + .toggle-slider {
     background: var(--bg-tertiary);
-    opacity: 0.6;
+    opacity: 0.7;
   }
 
   .toggle-input:disabled:checked + .toggle-slider {
@@ -948,7 +956,7 @@
   
   .cancel-button, .save-button {
     padding: 10px 20px;
-    border-radius: 6px;
+    border-radius: 8px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
@@ -1010,7 +1018,7 @@
   .api-key-input:focus {
     outline: none;
     border-color: var(--border-focus);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-focus) 20%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-focus) 15%, transparent);
   }
   
   .api-key-input::placeholder {
@@ -1025,7 +1033,7 @@
     border: none;
     cursor: pointer;
     padding: 8px;
-    border-radius: 4px;
+    border-radius: 6px;
     color: var(--text-secondary);
     transition: all 0.2s;
     display: flex;
@@ -1158,12 +1166,11 @@
   
   .github-signin-button:hover:not(:disabled) {
     background: #1f2328;
-    transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(36, 41, 47, 0.3);
   }
   
   .github-signin-button:disabled {
-    opacity: 0.7;
+    opacity: 0.8;
     cursor: not-allowed;
   }
   
@@ -1226,7 +1233,7 @@
     background: transparent;
     color: var(--text-secondary, #6b7280);
     border: 1px solid var(--border-color, #e2e8f0);
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -1260,7 +1267,7 @@
     padding: 8px 12px;
     background: #fef2f2;
     border: 1px solid #fecaca;
-    border-radius: 6px;
+    border-radius: 8px;
     color: #dc2626;
     font-size: 12px;
   }
@@ -1365,7 +1372,7 @@
     background: var(--border-focus, #3b82f6);
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
@@ -1374,11 +1381,10 @@
 
   .sync-button:hover:not(:disabled) {
     background: var(--border-focus-dark, #2563eb);
-    transform: translateY(-1px);
   }
 
   .sync-button:disabled {
-    opacity: 0.7;
+    opacity: 0.8;
     cursor: not-allowed;
   }
 

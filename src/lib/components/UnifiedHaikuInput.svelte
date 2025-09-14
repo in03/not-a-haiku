@@ -769,8 +769,9 @@
     if (allowedKeys.includes(event.key)) {
       // Handle backspace to shrink back to title input
       if (event.key === 'Backspace') {
-        // If content is empty or cursor is at the beginning, shrink back to title
-        if (content.trim() === '' || cursorPos === 0) {
+        // Only allow title editing if content is completely empty
+        // Don't trigger on cursor position alone to prevent accidental title editing
+        if (content.trim() === '') {
           event.preventDefault();
           step = 'title';
           isExpanded = false;
@@ -930,6 +931,16 @@
     title = '';
     content = '';
     syllableCounts = [];
+    
+    // Reset validation states to clear progress bar
+    validation = { isValid: false, isComplete: false, feedback: '' };
+    debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
+    
+    // Clear any pending validation timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+      validationTimeout = null;
+    }
   }
   
   // Update content and trigger validation
@@ -1277,7 +1288,7 @@
     color: var(--text-secondary, #9ca3af);
     transition: all 0.3s ease;
     z-index: 10;
-    opacity: 0.6;
+    opacity: 0.8;
   }
   
   .tts-button:hover {
@@ -1295,7 +1306,7 @@
     color: var(--text-secondary, #9ca3af);
     transform: none;
     box-shadow: none;
-    opacity: 0.4;
+    opacity: 0.6;
     cursor: help;
   }
   
@@ -1481,7 +1492,7 @@
       color: var(--text-secondary, #6b7280);
       box-shadow: none;
       transform: none;
-      opacity: 0.4;
+      opacity: 0.6;
     }
   }
 </style>

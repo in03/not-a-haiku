@@ -119,6 +119,11 @@
     border: 1px solid color-mix(in srgb, #3b82f6 25%, transparent);
   }
 
+  /* Ensure confetti appears above all modals */
+  canvas[style*="position: fixed"] {
+    z-index: 99999 !important;
+  }
+
   /* Native replacements for former DaisyUI utilities */
   /* Buttons */
   .btn { @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-150 select-none; }
@@ -143,21 +148,51 @@
   .badge-ghost { @apply bg-transparent text-neutral-500 border-neutral-300 dark:text-neutral-400 dark:border-neutral-700; }
 
   /* Cards */
-  .card { @apply rounded-2xl border border-neutral-200 dark:border-neutral-700 shadow-sm bg-[var(--bg-primary)] text-[color:var(--text-primary)]; }
+  .card { 
+    @apply rounded-2xl border shadow-sm; 
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+  }
   .card-body { @apply p-6; }
-  .card-footer { @apply border-t border-neutral-200 dark:border-neutral-700 p-4; }
+  .card-footer { 
+    @apply border-t p-4; 
+    border-color: var(--border-color);
+  }
 
   /* Inputs */
-  .input { @apply w-full px-3 py-2 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 outline-none; }
-  .input-bordered { @apply border border-neutral-300 dark:border-neutral-700 focus:ring-2 focus:ring-emerald-400; }
+  .input { 
+    @apply w-full px-3 py-2 rounded-lg outline-none; 
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
+  .input::placeholder { color: var(--text-tertiary); }
+  .input-bordered { 
+    @apply border focus:ring-2 focus:ring-opacity-50; 
+    border-color: var(--border-color);
+    --tw-ring-color: var(--border-focus);
+  }
   .input-lg { @apply text-base sm:text-lg py-3; }
 
   /* Textareas */
-  .textarea { @apply w-full p-3 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 outline-none; }
-  .textarea-bordered { @apply border border-neutral-300 dark:border-neutral-700 focus:ring-2 focus:ring-emerald-400; }
+  .textarea { 
+    @apply w-full p-3 rounded-lg outline-none; 
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
+  .textarea::placeholder { color: var(--text-tertiary); }
+  .textarea-bordered { 
+    @apply border focus:ring-2 focus:ring-opacity-50; 
+    border-color: var(--border-color);
+    --tw-ring-color: var(--border-focus);
+  }
 
   /* Alerts */
-  .alert { @apply flex items-center gap-2 rounded-lg border px-3 py-2 bg-neutral-50 border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700; }
+  .alert { 
+    @apply flex items-center gap-2 rounded-lg border px-3 py-2; 
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+  }
 
   /* Navbar tokens */
   .navbar { @apply flex items-center justify-between; }

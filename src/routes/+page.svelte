@@ -374,6 +374,7 @@
             if (currentHaikuId) {
               try {
                 await haikuStore.update(currentHaikuId, {
+                  tags: analysis.tags, // Copy suggested tags to main tags field
                   analysis: {
                     rating: analysis.rating,
                     commentary: analysis.comment,
@@ -396,6 +397,7 @@
             if (currentHaikuId) {
               try {
                 await haikuStore.update(currentHaikuId, {
+                  tags: analysis.tags, // Copy suggested tags to main tags field
                   analysis: {
                     rating: analysis.rating,
                     commentary: analysis.comment,
@@ -503,7 +505,7 @@
   <div class="text-center mb-4 animate-fade-in">
     <div class="flex items-center justify-center gap-3 mb-3 relative progress-title {$settingsStore.showProgressBar && progressPercentage > 0 ? 'show-progress' : ''}" 
          style="--progress: {progressPercentage}%">
-      <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r {debouncedValidation.isValid ? 'from-green-400 to-emerald-500' : 'from-sky-400 to-blue-500'} bg-clip-text text-transparent transition-all duration-500">
+      <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r {debouncedValidation.isValid ? 'from-green-400 to-emerald-500' : 'from-sky-400 to-blue-500'} bg-clip-text text-transparent transition-all duration-500 mb-2">
         {debouncedValidation.isValid ? `It's ${poemArticle} ${poemName}!` : `Not ${poemArticle} ${poemName}`}
       </h1>
       {#if debouncedValidation.isValid}
@@ -563,7 +565,7 @@
         />
         
         <!-- Action Buttons -->
-        <div class="mt-6 flex justify-center items-center gap-4">
+        <div class="mt-8 flex justify-center items-center gap-6">
           <button 
             class="btn btn-outline btn-lg flex items-center gap-2"
             on:click={handleEditHaiku}

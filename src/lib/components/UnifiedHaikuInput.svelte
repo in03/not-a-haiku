@@ -769,8 +769,9 @@
     if (allowedKeys.includes(event.key)) {
       // Handle backspace to shrink back to title input
       if (event.key === 'Backspace') {
-        // If content is empty or cursor is at the beginning, shrink back to title
-        if (content.trim() === '' || cursorPos === 0) {
+        // Only allow title editing if content is completely empty
+        // Don't trigger on cursor position alone to prevent accidental title editing
+        if (content.trim() === '') {
           event.preventDefault();
           step = 'title';
           isExpanded = false;

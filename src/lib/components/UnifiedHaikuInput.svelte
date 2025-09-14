@@ -931,6 +931,16 @@
     title = '';
     content = '';
     syllableCounts = [];
+    
+    // Reset validation states to clear progress bar
+    validation = { isValid: false, isComplete: false, feedback: '' };
+    debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
+    
+    // Clear any pending validation timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+      validationTimeout = null;
+    }
   }
   
   // Update content and trigger validation

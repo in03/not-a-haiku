@@ -57,7 +57,7 @@
 ### Layout & Navigation
 - [x] **Content centering** - Improve page layout balance
 - [x] **Title management** - Enable backspace to shrink content back to title input
-  - [ ] Note on this, when selecting all text and hitting backspace, this also triggers title input editing. It should not.
+  - [x] Note on this, when selecting all text and hitting backspace, this also triggers title input editing. It should not.
 - [ ] **Sticky validation state** - After adding debounced validation, the progress bar does not reset post-submission.
 - [x] **Search interface** - Create hybrid modal with integrated text input, probably kill the bar.
 - [ ] **Settings sadness** - Modifying settings clears any current haiku. It would be nice to save state.
@@ -89,4 +89,4 @@
 
 ### Data Management
 - [ ] **GitHub sync** - Resolve synchronization issues
-- [ ] **Task status management** - Implement task status change functionality
+- [x] **Task status management** - Implement task status change functionality

@@ -123,6 +123,8 @@
       await haikuStore.update(haiku.id, { status: newStatus });
       // Update the local haiku object immediately for UI reactivity
       haiku.status = newStatus;
+      // Force Svelte to detect the change by reassigning the array
+      filteredHaikus = filteredHaikus;
       dispatch('haikuUpdated');
     } catch (error) {
       console.error('Failed to update haiku status:', error);
@@ -288,7 +290,6 @@
     return new Date(timestamp).toLocaleDateString();
   }
   
-
   // Get status display text
   function getStatusText(status) {
     switch (status) {

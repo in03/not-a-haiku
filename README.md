@@ -1,5 +1,7 @@
 # 🚫 Not a Haiku 🍃
 
+> #ForTheLoveOfCode
+
 Not great at haikus?
 
 No problem!

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { GITHUB_CLIENT_ID } from '$lib/auth/github.js';
 import { OAUTH_CLIENT_SECRET } from '$env/static/private';
+import { OAUTH_CLIENT_SECRET } from '$env/static/private';
 
 // GitHub OAuth client secret from environment variables
 // Note: Using OAUTH_CLIENT_SECRET instead of GITHUB_CLIENT_SECRET due to GitHub's protected keyword restriction
@@ -36,6 +37,17 @@ if (!GITHUB_CLIENT_ID) {
  */
 export async function POST({ request, cookies }) {
   try {
+    // Check if required environment variables are available
+    if (!OAUTH_CLIENT_SECRET) {
+      console.error('❌ OAUTH_CLIENT_SECRET not set - OAuth token exchange will fail');
+      return json({ error: 'OAuth configuration error' }, { status: 500 });
+    }
+    
+    if (!GITHUB_CLIENT_ID) {
+      console.error('❌ GITHUB_CLIENT_ID not set - OAuth will fail');
+      return json({ error: 'OAuth configuration error' }, { status: 500 });
+    }
+    
     const { code, state } = await request.json();
     
     // Verify state parameter for CSRF protection
@@ -50,6 +62,7 @@ export async function POST({ request, cookies }) {
     // Exchange code for access token
     const tokenPayload = {
       client_id: GITHUB_CLIENT_ID,
+      client_secret: OAUTH_CLIENT_SECRET,
       client_secret: OAUTH_CLIENT_SECRET,
       code: code
     };

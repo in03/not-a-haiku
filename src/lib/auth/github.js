@@ -45,8 +45,10 @@ if (!REDIRECT_URI) {
 export function getGitHubAuthUrl(state) {
   if (!GITHUB_CLIENT_ID) {
     throw new Error('VITE_OAUTH_CLIENT_ID is not set');
+    throw new Error('VITE_OAUTH_CLIENT_ID is not set');
   }
   if (!REDIRECT_URI) {
+    throw new Error('VITE_OAUTH_REDIRECT_URI is not set');
     throw new Error('VITE_OAUTH_REDIRECT_URI is not set');
   }
   

@@ -1,7 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { GITHUB_CLIENT_ID } from '$lib/auth/github.js';
 import { OAUTH_CLIENT_SECRET } from '$env/static/private';
-import { OAUTH_CLIENT_SECRET } from '$env/static/private';
 
 // GitHub OAuth client secret from environment variables
 // Note: Using OAUTH_CLIENT_SECRET instead of GITHUB_CLIENT_SECRET due to GitHub's protected keyword restriction

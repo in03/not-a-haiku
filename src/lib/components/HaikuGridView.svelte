@@ -62,47 +62,47 @@
       lastFilterState = currentFilterState;
       
       filteredHaikus = haikus
-        .filter(haiku => {
+    .filter(haiku => {
           // In search mode, only show results when there's a search query
           if (!showAllMode && !searchQuery.trim()) {
             return false;
           }
           
-          // Status filter
-          if (filterStatus && haiku.status !== filterStatus) return false;
-          
-          // Tags filter (AND operation)
-          if (filterTags.length > 0 && !filterTags.every(tag => haiku.tags.includes(tag))) return false;
-          
-          // Search filter
-          if (searchQuery) {
-            const query = searchQuery.toLowerCase();
-            return (
-              haiku.title.toLowerCase().includes(query) ||
-              haiku.text.toLowerCase().includes(query) ||
-              haiku.tags.some(tag => tag.toLowerCase().includes(query)) ||
-              (haiku.analysis?.commentary || '').toLowerCase().includes(query)
-            );
-          }
-          
-          return true;
-        })
-        .sort((a, b) => {
-          let aVal = a[sortBy];
-          let bVal = b[sortBy];
-          
-          // Handle string sorting
-          if (typeof aVal === 'string' && typeof bVal === 'string') {
-            aVal = aVal.toLowerCase();
-            bVal = bVal.toLowerCase();
-          }
-          
-          let comparison = 0;
-          if (aVal < bVal) comparison = -1;
-          else if (aVal > bVal) comparison = 1;
-          
-          return sortOrder === 'desc' ? -comparison : comparison;
-        });
+      // Status filter
+      if (filterStatus && haiku.status !== filterStatus) return false;
+      
+      // Tags filter (AND operation)
+      if (filterTags.length > 0 && !filterTags.every(tag => haiku.tags.includes(tag))) return false;
+      
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return (
+          haiku.title.toLowerCase().includes(query) ||
+          haiku.text.toLowerCase().includes(query) ||
+          haiku.tags.some(tag => tag.toLowerCase().includes(query)) ||
+          (haiku.analysis?.commentary || '').toLowerCase().includes(query)
+        );
+      }
+      
+      return true;
+    })
+    .sort((a, b) => {
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
+      
+      // Handle string sorting
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        aVal = aVal.toLowerCase();
+        bVal = bVal.toLowerCase();
+      }
+      
+      let comparison = 0;
+      if (aVal < bVal) comparison = -1;
+      else if (aVal > bVal) comparison = 1;
+      
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
     }
   }
   
@@ -116,7 +116,7 @@
     
     // Trigger confetti animation if marking as done
     if (newStatus === 'done') {
-      dispatch('confetti');
+        dispatch('confetti');
     }
     
     try {
@@ -515,7 +515,7 @@
             {#if searchQuery}
               <button class="search-clear" on:click={() => searchQuery = ''} title="Clear search">
                 <X size="16" />
-              </button>
+          </button>
             {/if}
           </div>
           
@@ -540,7 +540,7 @@
       
       <!-- Filters -->
       {#if showFilters || showAllMode || (filteredHaikus.length > 0 && !showAllMode)}
-        <div class="filters-section" on:click={handleFiltersClick}>
+        <div class="filters-section">
           {#if selectedHaikus.size > 0}
             <!-- Multi-select actions -->
             <div class="multi-select-actions">
@@ -586,8 +586,8 @@
                     <option value="title">Title</option>
                   </select>
                 </div>
-                <button
-                  class="sort-order-button"
+                <button 
+                  class="sort-order-button" 
                   on:click={() => sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'}
                   title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
                 >
@@ -653,7 +653,7 @@
             {/if}
           </div>
         {:else}
-           <div class="haiku-grid">
+          <div class="haiku-grid">
              {#each filteredHaikus as haiku, index}
                <div
                  class="haiku-card"
@@ -665,25 +665,25 @@
                  tabindex="0"
                  role="button"
                >
-                 <!-- Card Header -->
-                 <div class="haiku-card-header">
-                   <div class="haiku-title-section">
+                <!-- Card Header -->
+                <div class="haiku-card-header">
+                  <div class="haiku-title-section">
                      <h3 class="haiku-title">{haiku.title}</h3>
                    </div>
                    
-                   {#if $settingsStore.enableTaskTracking}
-                     <button
+                    {#if $settingsStore.enableTaskTracking}
+                      <button
                        class="task-checkbox"
-                       class:done={haiku.status === 'done'}
+                        class:done={haiku.status === 'done'}
                        on:click|stopPropagation={() => toggleHaikuStatus(haiku)}
                        title={haiku.status === 'done' ? 'Mark as not done' : 'Mark as done'}
-                     >
-                       {#if haiku.status === 'done'}
-                         <Check size="14" />
-                       {/if}
-                     </button>
-                   {/if}
-                 </div>
+                      >
+                        {#if haiku.status === 'done'}
+                          <Check size="14" />
+                        {/if}
+                      </button>
+                    {/if}
+                </div>
                 
                 <!-- Haiku Content -->
                 <div class="haiku-content">
@@ -790,6 +790,91 @@
     padding: 20px 24px;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-secondary);
+    gap: 16px;
+  }
+
+  .grid-view-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .grid-view-title h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .haiku-count {
+    font-size: 14px;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .header-search-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .header-search-container {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .header-search-input {
+    width: 100%;
+    padding: 12px 40px 12px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    outline: none;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    color: var(--text-primary);
+  }
+
+  .header-search-input:focus {
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--border-focus) 15%, transparent);
+  }
+
+  .header-search-input::placeholder {
+    color: var(--text-tertiary);
+  }
+
+  .grid-view-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 16px;
+    flex-shrink: 0;
+  }
+
+  .close-button {
+    padding: 8px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .close-button:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
   }
 
   /* Prominent Search Section */
@@ -1337,7 +1422,7 @@
     flex: 1;
     min-width: 0;
   }
-  
+
   .task-checkbox {
     width: 24px;
     height: 24px;
@@ -1363,7 +1448,7 @@
     background: #10b981;
     color: white;
   }
-  
+
   .task-checkbox.done:hover {
     background: #059669;
   }
@@ -1479,5 +1564,241 @@
   .status-done {
     background: #d1fae5;
     color: #065f46;
+  }
+
+  /* Mobile Responsiveness */
+  @media (max-width: 768px) {
+    .grid-view-overlay {
+      padding: 10px;
+    }
+
+    .grid-view-modal {
+      max-height: 95vh;
+    }
+
+    .grid-view-header {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 16px;
+      gap: 12px;
+    }
+
+    .grid-view-title {
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .grid-view-title h2 {
+      font-size: 18px;
+      flex: 1;
+    }
+
+    .haiku-count {
+      font-size: 12px;
+      padding: 3px 6px;
+      flex-shrink: 0;
+    }
+
+    .header-search-section {
+      gap: 8px;
+    }
+
+    .header-search-container {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .header-search-input {
+      font-size: 16px; /* Prevent zoom on iOS */
+      padding: 10px 35px 10px 10px;
+    }
+
+    .mode-toggle {
+      padding: 10px 12px;
+      font-size: 13px;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .grid-view-actions {
+      margin-left: 0;
+      justify-content: flex-end;
+    }
+
+    .close-button {
+      padding: 6px;
+    }
+
+    .close-button :global(svg) {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Mobile grid adjustments */
+    .haiku-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .haiku-card {
+      padding: 12px;
+    }
+
+    .haiku-card-header {
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .haiku-title {
+      font-size: 14px;
+    }
+
+    .haiku-content {
+      margin-bottom: 8px;
+    }
+
+    .haiku-line {
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .haiku-card-footer {
+      padding: 8px 0 0 0;
+      gap: 8px;
+    }
+
+    .haiku-meta {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .haiku-tags {
+      gap: 3px;
+    }
+
+    .haiku-tag {
+      font-size: 10px;
+      padding: 2px 4px;
+    }
+
+    .haiku-info {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .haiku-date {
+      font-size: 11px;
+    }
+
+    .haiku-status {
+      font-size: 9px;
+      padding: 2px 4px;
+    }
+
+    /* Mobile filters */
+    .filters-section {
+      padding: 12px;
+    }
+
+    .filter-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+
+    .filter-group {
+      width: 100%;
+    }
+
+    .filter-label {
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .filter-select {
+      width: 100%;
+      font-size: 14px;
+      padding: 8px 12px;
+    }
+
+    .sort-controls {
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .sort-toggle {
+      font-size: 12px;
+      padding: 6px 10px;
+    }
+
+    .clear-filters {
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+
+    /* Mobile multi-select actions */
+    .multi-select-actions {
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+
+    .selected-count {
+      font-size: 12px;
+    }
+
+    .action-button {
+      font-size: 12px;
+      padding: 6px 10px;
+    }
+
+    /* Mobile keyboard shortcuts */
+    .keyboard-shortcuts {
+      max-width: 100%;
+      margin-top: 12px;
+    }
+
+    .keyboard-shortcuts li {
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .keyboard-shortcuts kbd {
+      font-size: 9px;
+      padding: 1px 3px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .grid-view-header {
+      padding: 12px;
+      gap: 10px;
+    }
+
+    .grid-view-title h2 {
+      font-size: 16px;
+    }
+
+    .header-search-section {
+      flex-direction: column;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .header-search-container {
+      min-width: auto;
+    }
+
+    .mode-toggle {
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* Hide search icon on very small screens to save space */
+    .search-icon {
+      display: none;
+    }
   }
 </style>

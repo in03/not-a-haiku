@@ -655,4 +655,175 @@
   .rotated {
     transform: rotate(180deg);
   }
+
+  /* Mobile Responsiveness */
+  @media (max-width: 768px) {
+    .viewer-overlay {
+      padding: 10px;
+    }
+
+    .viewer-modal {
+      max-height: 95vh;
+      border-radius: 12px;
+    }
+
+    .viewer-header {
+      padding: 16px 16px 12px 16px;
+      gap: 12px;
+    }
+
+    .viewer-title h2 {
+      font-size: 18px;
+      line-height: 1.3;
+    }
+
+    .viewer-date {
+      font-size: 12px;
+    }
+
+    .close-button {
+      padding: 6px;
+      flex-shrink: 0;
+    }
+
+    .close-button :global(svg) {
+      width: 18px;
+      height: 18px;
+    }
+
+    .viewer-toolbar {
+      padding: 12px 16px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-left {
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-button {
+      font-size: 13px;
+      padding: 8px 12px;
+      gap: 6px;
+    }
+
+    .status-button {
+      font-size: 13px;
+      padding: 8px 12px;
+      min-width: 100px;
+    }
+
+    .toolbar-tags {
+      max-width: 100%;
+      margin-top: 8px;
+    }
+
+    .tag-item {
+      font-size: 11px;
+      padding: 3px 6px;
+      min-height: 22px;
+    }
+
+    .haiku-display {
+      padding: 16px 20px;
+      margin: 12px 16px;
+    }
+
+    .haiku-display .haiku-text {
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    .quote-open,
+    .quote-close {
+      font-size: 36px;
+    }
+
+    .quote-open {
+      top: -3px;
+      left: 3px;
+    }
+
+    .quote-close {
+      bottom: -8px;
+      right: 3px;
+    }
+
+    /* Mobile status dropdown */
+    .status-dropdown-menu {
+      right: 0;
+      left: auto;
+      min-width: 120px;
+    }
+
+    .status-option {
+      font-size: 13px;
+      padding: 8px 12px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .viewer-header {
+      padding: 12px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+
+    .viewer-title {
+      text-align: center;
+    }
+
+    .viewer-title h2 {
+      font-size: 16px;
+    }
+
+    .close-button {
+      align-self: flex-end;
+      position: absolute;
+      top: 12px;
+      right: 12px;
+    }
+
+    .viewer-toolbar {
+      padding: 8px 12px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+
+    .toolbar-left {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toolbar-button,
+    .status-button {
+      width: 100%;
+      justify-content: center;
+      font-size: 14px;
+      padding: 10px 16px;
+    }
+
+    .toolbar-tags {
+      margin-top: 0;
+      justify-content: center;
+    }
+
+    .haiku-display {
+      padding: 12px 16px;
+      margin: 8px 12px;
+    }
+
+    .haiku-display .haiku-text {
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .quote-open,
+    .quote-close {
+      font-size: 30px;
+    }
+  }
 </style>

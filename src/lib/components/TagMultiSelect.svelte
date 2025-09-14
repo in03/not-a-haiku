@@ -190,14 +190,14 @@
 <style>
   .tag-multiselect {
     position: relative;
-    width: 200px; /* Fixed width to match other dropdowns */
-    min-width: 200px;
+    min-width: 150px; /* Match other dropdowns */
+    width: 200px; /* Default width for desktop */
   }
 
   .selected-tags-container {
     min-height: 40px;
     max-height: 40px;
-    padding: 8px 12px;
+    padding: 8px 32px 8px 12px; /* Add right padding for arrow space */
     border: 1px solid var(--border-color);
     border-radius: 8px;
     background: var(--bg-primary);
@@ -206,6 +206,7 @@
     align-items: center;
     gap: 8px;
     transition: all 0.2s ease;
+    position: relative;
   }
 
   .selected-tags-container:hover {
@@ -264,16 +265,20 @@
   }
 
   .dropdown-arrow {
+    position: absolute;
+    right: 8px; /* Match other dropdowns */
+    top: 50%;
+    transform: translateY(-50%);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-tertiary);
+    color: var(--text-secondary); /* Match other dropdowns */
     transition: transform 0.2s ease;
-    flex-shrink: 0;
+    pointer-events: none;
   }
 
   .dropdown-arrow.open {
-    transform: rotate(180deg);
+    transform: translateY(-50%) rotate(180deg);
   }
 
   .dropdown-menu {
@@ -288,6 +293,7 @@
     z-index: 1000;
     margin-top: 4px;
     overflow: hidden;
+    touch-action: manipulation; /* Allow touch interactions within dropdown */
   }
 
   .search-container {
@@ -318,6 +324,8 @@
   .tag-options {
     overflow-y: auto;
     max-height: 200px;
+    -webkit-overflow-scrolling: touch; /* Enable smooth scrolling on iOS */
+    touch-action: pan-y; /* Allow vertical scrolling on touch devices */
   }
 
   .tag-option {
@@ -385,5 +393,73 @@
   .clear-all:hover {
     background: var(--bg-tertiary);
     color: var(--text-primary);
+  }
+
+  /* Mobile Responsiveness */
+  @media (max-width: 768px) {
+    .tag-multiselect {
+      width: 100%; /* Full width on mobile like other dropdowns */
+      min-width: 0;
+    }
+
+    .selected-tags-container {
+      min-height: 36px;
+      max-height: 36px;
+      padding: 6px 28px 6px 10px;
+      font-size: 14px;
+    }
+
+    .dropdown-arrow {
+      right: 6px;
+    }
+
+    .dropdown-menu {
+      font-size: 14px;
+      /* Ensure proper touch scrolling on mobile */
+      -webkit-overflow-scrolling: touch;
+      touch-action: manipulation;
+    }
+
+    .tag-options {
+      /* Enhanced mobile scrolling */
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+      /* Slightly smaller max-height on mobile for better UX */
+      max-height: 180px;
+    }
+
+    .tag-option {
+      padding: 8px 12px;
+      font-size: 14px;
+      /* Ensure touch targets are large enough */
+      min-height: 44px;
+    }
+
+    .search-input {
+      font-size: 14px;
+      padding: 6px 10px;
+    }
+
+    .selected-tag {
+      font-size: 11px;
+      padding: 3px 6px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .selected-tags-container {
+      min-height: 34px;
+      max-height: 34px;
+      padding: 5px 26px 5px 8px;
+    }
+
+    .dropdown-arrow {
+      right: 5px;
+    }
+
+    .selected-tag {
+      font-size: 10px;
+      padding: 2px 4px;
+    }
   }
 </style>

@@ -15,7 +15,7 @@
   - [x] Edit and delete functionality
   - [x] Modal view for longer content (etherees)
   - [x] Direct editor integration from grid view
-  - [ ] Fix task checkbox toggle not updating visually in grid view
+  - [x] Fix task checkbox toggle not updating visually in grid view
 - [x] **Unified search experience** - Consolidate search bar and Ctrl+K functionality into a single, intuitive modal interface
 
 ## 🔧 Technical Improvements
@@ -82,8 +82,8 @@
 
 ### Mobile
 - [ ] Autocomplete seems to cause counting and validation issues.
-- [ ] Responsiveness issues
- - [ ] Worst for the grid view modal atm
+- [x] Responsiveness issues
+ - [x] Worst for the grid view modal atm
 
 ## 🔄 System Integration
 

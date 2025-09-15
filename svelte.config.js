@@ -1,18 +1,11 @@
-import adapter from '@sveltejs/adapter-static';
+import adapter from '@sveltejs/adapter-vercel';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	kit: {
 		adapter: adapter({
-			pages: 'build',
-			assets: 'build',
-			fallback: '404.html',
-			precompress: false,
-			strict: false
+			// Vercel adapter handles most configuration automatically
 		}),
-		paths: {
-			base: process.env.NODE_ENV === 'production' ? '/not-a-haiku' : ''
-		},
 		prerender: {
 			handleHttpError: ({ path, referrer, message }) => {
 				// Ignore missing favicon

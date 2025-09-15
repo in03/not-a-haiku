@@ -105,3 +105,4 @@ cypress/results/
 *.log
 npm-debug.log*
 # End Generation Here
+.vercel

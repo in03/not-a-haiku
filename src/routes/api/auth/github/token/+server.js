@@ -49,27 +49,26 @@ export async function POST({ request, cookies }) {
     
     const { code, state } = await request.json();
     
-    // Verify state parameter for CSRF protection
-    const storedState = cookies.get('oauth_state');
-    if (!storedState || storedState !== state) {
-      return json({ error: 'Invalid state parameter' }, { status: 400 });
-    }
-    
-    // Clear the state cookie
-    cookies.delete('oauth_state', { path: '/' });
+    // Note: State validation is handled client-side due to proxy redirect flow
+    // The proxy redirect means cookies don't flow properly between domains
+    // Client-side validation in exchangeCodeForToken provides CSRF protection
     
     // Exchange code for access token
+    // Use the same proxy callback URL that GitHub redirects to
+    const redirectUri = 'https://haiku.trevatt.co/api/auth/github/callback';
+    
     const tokenPayload = {
       client_id: GITHUB_CLIENT_ID,
       client_secret: OAUTH_CLIENT_SECRET,
-      client_secret: OAUTH_CLIENT_SECRET,
-      code: code
+      code: code,
+      redirect_uri: redirectUri
     };
     
     console.log('Token exchange payload:', {
       client_id: tokenPayload.client_id,
       client_secret: tokenPayload.client_secret ? '[REDACTED]' : 'MISSING',
-      code: tokenPayload.code ? '[REDACTED]' : 'MISSING'
+      code: tokenPayload.code ? '[REDACTED]' : 'MISSING',
+      redirect_uri: tokenPayload.redirect_uri
     });
     
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {

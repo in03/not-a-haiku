@@ -9,6 +9,7 @@
   import { onMount } from 'svelte';
   import HaikuGridView from '$lib/components/HaikuGridView.svelte';
   import confetti from 'canvas-confetti';
+  import { getGitHubAuthUrl, generateState, isOAuthAvailable } from '$lib/auth/github.js';
   let isMenuOpen = false;
   
   
@@ -100,7 +101,26 @@
   
   // Handle GitHub sign in
   function handleGitHubSignIn() {
-    window.location.href = '/api/auth/github';
+    // Check if OAuth is configured
+    if (!isOAuthAvailable) {
+      alert('GitHub authentication is not configured. Please check your environment variables.');
+      return;
+    }
+    
+    try {
+      // Generate CSRF state and store it
+      const state = generateState();
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('oauth_state', state);
+      }
+      
+      // Redirect to GitHub OAuth authorization
+      const authUrl = getGitHubAuthUrl(state);
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Failed to initiate GitHub OAuth:', error);
+      alert('GitHub OAuth is not properly configured. Please check your environment variables.');
+    }
   }
   
   // Modal state
@@ -145,30 +165,37 @@
             </a>
             
             <!-- GitHub Authentication - moved to far right -->
-            {#if $authStore.isAuthenticated && $authStore.user}
-              <!-- Sign Out Button -->
-              <button 
-                class="btn btn-sm btn-outline btn-error"
-                on:click={showSignOutConfirmation}
-              >
-                <Github class="w-4 h-4" />
-                <span>Sign Out</span>
-              </button>
-            {:else}
-              <!-- Sign In Button -->
-              <button 
-                class="btn btn-sm btn-primary"
-                on:click={handleGitHubSignIn}
-                disabled={$authStore.isLoading}
-              >
-                {#if $authStore.isLoading}
-                  <span class="loading loading-spinner loading-xs"></span>
-                  <span>Connecting...</span>
-                {:else}
+            {#if isOAuthAvailable}
+              {#if $authStore.isAuthenticated && $authStore.user}
+                <!-- Sign Out Button -->
+                <button 
+                  class="btn btn-sm btn-outline btn-error"
+                  on:click={showSignOutConfirmation}
+                >
                   <Github class="w-4 h-4" />
-                  <span>Sign In</span>
-                {/if}
-              </button>
+                  <span>Sign Out</span>
+                </button>
+              {:else}
+                <!-- Sign In Button -->
+                <button 
+                  class="btn btn-sm btn-primary"
+                  on:click={handleGitHubSignIn}
+                  disabled={$authStore.isLoading}
+                >
+                  {#if $authStore.isLoading}
+                    <span class="loading loading-spinner loading-xs"></span>
+                    <span>Connecting...</span>
+                  {:else}
+                    <Github class="w-4 h-4" />
+                    <span>Sign In</span>
+                  {/if}
+                </button>
+              {/if}
+            {:else}
+              <!-- OAuth not configured notice -->
+              <span class="text-xs text-base-content/50" title="GitHub authentication requires environment variables">
+                OAuth not configured
+              </span>
             {/if}
           </nav>
           <button class="btn btn-sm btn-ghost sm:hidden" aria-label="Open menu" on:click={openMenu}>
@@ -231,29 +258,39 @@
       <div class="divider my-1"></div>
       
       <!-- GitHub Authentication (Mobile) -->
-      {#if $authStore.isAuthenticated && $authStore.user}
-        <button 
-          class="btn btn-outline btn-error"
-          on:click={() => { showSignOutConfirmation(); closeMenu(); }}
-        >
-          <Github class="w-4 h-4" />
-          <span class="ml-2">Sign Out</span>
-        </button>
-        <div class="divider my-1"></div>
-      {:else}
-        <button 
-          class="btn btn-primary"
-          on:click={() => { handleGitHubSignIn(); closeMenu(); }}
-          disabled={$authStore.isLoading}
-        >
-          {#if $authStore.isLoading}
-            <span class="loading loading-spinner loading-xs"></span>
-            <span class="ml-2">Connecting...</span>
-          {:else}
+      {#if isOAuthAvailable}
+        {#if $authStore.isAuthenticated && $authStore.user}
+          <button 
+            class="btn btn-outline btn-error"
+            on:click={() => { showSignOutConfirmation(); closeMenu(); }}
+          >
             <Github class="w-4 h-4" />
-            <span class="ml-2">Sign In with GitHub</span>
-          {/if}
-        </button>
+            <span class="ml-2">Sign Out</span>
+          </button>
+          <div class="divider my-1"></div>
+        {:else}
+          <button 
+            class="btn btn-primary"
+            on:click={() => { handleGitHubSignIn(); closeMenu(); }}
+            disabled={$authStore.isLoading}
+          >
+            {#if $authStore.isLoading}
+              <span class="loading loading-spinner loading-xs"></span>
+              <span class="ml-2">Connecting...</span>
+            {:else}
+              <Github class="w-4 h-4" />
+              <span class="ml-2">Sign In with GitHub</span>
+            {/if}
+          </button>
+          <div class="divider my-1"></div>
+        {/if}
+      {:else}
+        <!-- OAuth not available notice -->
+        <div class="text-center py-2">
+          <span class="text-xs text-base-content/50">
+            GitHub authentication unavailable on static deployments
+          </span>
+        </div>
         <div class="divider my-1"></div>
       {/if}
       

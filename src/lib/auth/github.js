@@ -5,11 +5,24 @@
 // Environment detection
 const isDevelopment = import.meta.env.DEV;
 const isProduction = import.meta.env.PROD;
+// Vercel supports full serverless functionality, no static build limitations
 
 // OAuth configuration from environment variables
 // Note: Using VITE_OAUTH prefix instead of VITE_GITHUB due to GitHub's protected keyword restriction
 export const GITHUB_CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID;
-export const REDIRECT_URI = import.meta.env.VITE_OAUTH_REDIRECT_URI;
+
+// OAuth availability check (no longer need REDIRECT_URI in env vars)
+export const isOAuthAvailable = Boolean(GITHUB_CLIENT_ID);
+
+/**
+ * Generate OAuth redirect URI - always points to production proxy
+ * The proxy will intelligently redirect back to the appropriate environment
+ */
+export function getRedirectUri(origin = '') {
+  // Always use custom domain proxy callback for OAuth
+  // The proxy will detect the environment and redirect appropriately
+  return 'https://haiku.trevatt.co/api/auth/github/callback';
+}
 
 // Environment-specific configuration
 const config = {
@@ -31,30 +44,22 @@ if (!GITHUB_CLIENT_ID) {
   console.warn(`⚠️  VITE_OAUTH_CLIENT_ID not set for ${envType} - GitHub OAuth will not work`);
   console.warn(`💡 ${isDevelopment ? 'Create a development OAuth app and add to .env.local' : 'Set production OAuth app ID in deployment platform'}`);
 }
-if (!REDIRECT_URI) {
-  const envType = isDevelopment ? 'development' : 'production';
-  console.warn(`⚠️  VITE_OAUTH_REDIRECT_URI not set for ${envType} - GitHub OAuth will not work`);
-  console.warn(`💡 ${isDevelopment ? 'Set to your Tailscale tunnel URL or localhost:5173' : 'Set to your production domain'}`);
-}
 
 /**
  * Generate GitHub OAuth authorization URL
  * @param {string} state - CSRF protection state parameter
  * @returns {string} Authorization URL
  */
-export function getGitHubAuthUrl(state) {
+export function getGitHubAuthUrl(state, origin = '') {
   if (!GITHUB_CLIENT_ID) {
     throw new Error('VITE_OAUTH_CLIENT_ID is not set');
-    throw new Error('VITE_OAUTH_CLIENT_ID is not set');
   }
-  if (!REDIRECT_URI) {
-    throw new Error('VITE_OAUTH_REDIRECT_URI is not set');
-    throw new Error('VITE_OAUTH_REDIRECT_URI is not set');
-  }
+  
+  const redirectUri = getRedirectUri(origin);
   
   const params = new URLSearchParams({
     client_id: GITHUB_CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri,
     scope: oauthConfig.scopes, // Environment-specific scopes
     state: state,
     allow_signup: oauthConfig.allowSignup
@@ -67,23 +72,78 @@ export function getGitHubAuthUrl(state) {
  * Exchange OAuth code for access token
  * @param {string} code - Authorization code from GitHub
  * @param {string} state - State parameter for CSRF protection
- * @returns {Promise<{access_token?: string, error?: string}>}
+ * @returns {Promise<{access_token?: string, user?: object, error?: string}>}
  */
 export async function exchangeCodeForToken(code, state) {
   try {
-    const response = await fetch('/api/auth/github/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ code, state })
+    // Verify state client-side for CSRF protection
+    const storedState = typeof window !== 'undefined' ? sessionStorage.getItem('oauth_state') : null;
+    
+    // Debug state validation
+    console.log('State validation:', {
+      storedState,
+      receivedState: state,
+      match: storedState === state
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    if (!storedState) {
+      throw new Error('No stored state found - session may have expired');
     }
     
-    return await response.json();
+    if (storedState !== state) {
+      // Try URL decoding in case state got encoded during redirect
+      const decodedState = decodeURIComponent(state);
+      if (storedState === decodedState) {
+        console.log('State matched after URL decoding');
+      } else {
+        console.error('State mismatch - possible CSRF attack:', {
+          stored: storedState,
+          received: state,
+          decoded: decodedState
+        });
+        throw new Error('Invalid state parameter - possible CSRF attack');
+      }
+    }
+    
+    // Clear the stored state
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('oauth_state');
+    }
+    
+    // Use our server-side token exchange endpoint (secure)
+    // This avoids CORS issues and keeps the client secret server-side only
+    const tokenResponse = await fetch('/api/auth/github/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        code: code,
+        state: state
+      })
+    });
+    
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      throw new Error(`Token exchange failed: ${errorText}`);
+    }
+    
+    const result = await tokenResponse.json();
+    
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    
+    if (!result.access_token || !result.user) {
+      throw new Error('Invalid token exchange response');
+    }
+    
+    // Server already fetched user information, just return the result
+    return {
+      access_token: result.access_token,
+      user: result.user
+    };
+    
   } catch (error) {
     console.error('Token exchange error:', error);
     return { error: error.message };

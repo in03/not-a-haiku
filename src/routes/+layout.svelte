@@ -60,6 +60,19 @@
     viewerOpen = false;
   }
   
+  // Handle edit from viewer
+  function handleEdit(event) {
+    const haiku = event.detail;
+    // Close the grid view and navigate to home with the haiku data
+    closeGridView();
+    // Store the haiku data for editing
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('editHaiku', JSON.stringify(haiku));
+      // Navigate to home page
+      window.location.href = base || '/';
+    }
+  }
+  
   async function refreshHaikus() {
     try {
       allHaikus = await haikuStore.load();
@@ -198,9 +211,17 @@
               </span>
             {/if}
           </nav>
-          <button class="btn btn-sm btn-ghost sm:hidden" aria-label="Open menu" on:click={openMenu}>
-            <Menu class="w-5 h-5" />
-          </button>
+          <div class="flex items-center gap-1 sm:hidden">
+            <!-- Search button (Mobile) -->
+            <button class="btn btn-sm btn-ghost" on:click={openGridView} aria-label="Search haikus">
+              <Search class="w-4 h-4" />
+            </button>
+            
+            <!-- Mobile menu button -->
+            <button class="btn btn-sm btn-ghost" aria-label="Open menu" on:click={openMenu}>
+              <Menu class="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -212,10 +233,10 @@
 
   <footer class="w-full border-t border-base-300 bg-base-100 text-base-content py-2 flex-shrink-0">
   <div class="container mx-auto px-4">
-    <!-- Single row with features left, credit right -->
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm">
-      <!-- Feature indicators -->
-      <div class="flex items-center gap-3 sm:gap-4 text-xs text-base-content/50">
+    <!-- Single row with features left, credit right (features hidden on mobile/tablet) -->
+    <div class="flex flex-col sm:flex-row items-center lg:justify-between justify-center gap-2 text-sm">
+      <!-- Feature indicators (hidden on mobile and tablet) -->
+      <div class="hidden lg:flex items-center gap-3 sm:gap-4 text-xs text-base-content/50">
         <span class="flex items-center gap-1">
           <span class="w-1 h-1 bg-green-500 rounded-full"></span>
           Tasks as poetry
@@ -250,11 +271,7 @@
       </button>
     </div>
     <nav class="flex flex-col gap-2">
-      <!-- Search button (Mobile) -->
-      <button class="btn btn-ghost" on:click={() => { openGridView(); closeMenu(); }}>
-        <Search class="w-4 h-4" />
-        <span class="ml-2">Search Haikus</span>
-      </button>
+      <!-- Search button (Mobile) - moved to navbar -->
       <div class="divider my-1"></div>
       
       <!-- GitHub Authentication (Mobile) -->
@@ -380,6 +397,7 @@
   on:close={closeGridView}
   on:viewerOpen={handleViewerOpen}
   on:viewerClose={handleViewerClose}
+  on:edit={handleEdit}
   on:haikuUpdated={refreshHaikus}
   on:haikuDeleted={refreshHaikus}
   on:confetti={triggerConfetti}

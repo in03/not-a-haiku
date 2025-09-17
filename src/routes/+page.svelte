@@ -28,6 +28,28 @@
       showModelError = true;
     }
     
+    // Check for edit haiku data from session storage
+    if (typeof window !== 'undefined') {
+      const editHaikuData = sessionStorage.getItem('editHaiku');
+      if (editHaikuData) {
+        try {
+          const haiku = JSON.parse(editHaikuData);
+          // Load the haiku for editing
+          title = haiku.title || '';
+          content = haiku.content || '';
+          // Clear the session storage
+          sessionStorage.removeItem('editHaiku');
+          // Update the input component
+          if (unifiedInputComponent) {
+            unifiedInputComponent.updateContent(content);
+          }
+        } catch (error) {
+          console.error('Failed to parse edit haiku data:', error);
+          sessionStorage.removeItem('editHaiku');
+        }
+      }
+    }
+    
     // Global error handler for ML errors
     window.addEventListener('error', (event) => {
       if (event.error && event.error.message && event.error.message.includes('ML syllable counting failed')) {

@@ -455,6 +455,14 @@
     }
   }
 
+  // Clear all filters
+  function clearAllFilters() {
+    filterStatus = '';
+    filterTags = [];
+    searchQuery = '';
+    showAllMode = false;
+  }
+
   // Reset selection when filtered results change
   $: if (filteredHaikus.length > 0) {
     if (selectedIndex >= filteredHaikus.length) {
@@ -496,44 +504,102 @@
     <div class="grid-view-modal" on:click|stopPropagation>
       <!-- Header -->
       <div class="grid-view-header">
-        <div class="grid-view-title">
-          <Search class="search-icon" size="20" />
-          <h2>{showAllMode ? 'Browse All Haikus' : 'Search Haikus'}</h2>
-          <span class="haiku-count">{filteredHaikus.length} of {haikus.length}</span>
-        </div>
-        
-        <!-- Inline Search and Mode Toggle -->
-        <div class="header-search-section">
-          <div class="header-search-container">
-            <input
-              type="text"
-              class="header-search-input"
-              placeholder={showAllMode ? "Search in all haikus..." : "Search haikus by title, content, or tags..."}
-              bind:value={searchQuery}
-              bind:this={searchInput}
-            />
-            {#if searchQuery}
-              <button class="search-clear" on:click={() => searchQuery = ''} title="Clear search">
-                <X size="16" />
-          </button>
-            {/if}
+        <!-- Desktop Header -->
+        <div class="desktop-header">
+          <div class="grid-view-title">
+            <Search class="search-icon" size="20" />
+            <h2>{showAllMode ? 'Browse All Haikus' : 'Search Haikus'}</h2>
+            <span class="haiku-count">{filteredHaikus.length} of {haikus.length}</span>
           </div>
           
-          <button class="mode-toggle" class:active={showAllMode} on:click={toggleShowAllMode}>
-            {#if showAllMode}
-              <Search size="16" />
-              <span>Search Mode</span>
-            {:else}
-              <Grid3X3 size="16" />
-              <span>Browse All</span>
-            {/if}
-          </button>
+          <!-- Inline Search and Mode Toggle -->
+          <div class="header-search-section">
+            <div class="header-search-container">
+              <input
+                type="text"
+                class="header-search-input"
+                placeholder={showAllMode ? "Search in all haikus..." : "Search haikus by title, content, or tags..."}
+                bind:value={searchQuery}
+                bind:this={searchInput}
+              />
+              {#if searchQuery}
+                <button class="search-clear" on:click={() => searchQuery = ''} title="Clear search">
+                  <X size="16" />
+                </button>
+              {/if}
+            </div>
+            
+            <button class="mode-toggle" class:active={showAllMode} on:click={toggleShowAllMode}>
+              {#if showAllMode}
+                <Search size="16" />
+                <span>Search Mode</span>
+              {:else}
+                <Grid3X3 size="16" />
+                <span>Browse All</span>
+              {/if}
+            </button>
+          </div>
+          
+          <div class="grid-view-actions">
+            <button class="close-button" on:click={closeGridView}>
+              <X size="20" />
+            </button>
+          </div>
         </div>
-        
-        <div class="grid-view-actions">
-          <button class="close-button" on:click={closeGridView}>
-            <X size="20" />
-          </button>
+
+        <!-- Mobile Header -->
+        <div class="mobile-header">
+          <!-- Top row: Back button, Search input, Browse toggle -->
+          <div class="mobile-header-top">
+            <button class="mobile-back-button" on:click={closeGridView} title="Back">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m12 19-7-7 7-7"/>
+                <path d="M19 12H5"/>
+              </svg>
+            </button>
+            
+            <div class="mobile-search-container">
+              <input
+                type="text"
+                class="mobile-search-input"
+                placeholder="Search haikus..."
+                bind:value={searchQuery}
+                bind:this={searchInput}
+              />
+              {#if searchQuery}
+                <button class="mobile-search-clear" on:click={() => searchQuery = ''} title="Clear search">
+                  <X size="16" />
+                </button>
+              {/if}
+            </div>
+            
+            <button class="mobile-mode-toggle" class:active={showAllMode} on:click={toggleShowAllMode} title={showAllMode ? 'Switch to search mode' : 'Browse all haikus'}>
+              <Grid3X3 size="18" />
+            </button>
+          </div>
+          
+          <!-- Bottom row: Compact filter buttons -->
+          <div class="mobile-filters-row">
+            <button class="mobile-filter-button" class:active={filterStatus === 'todo'} on:click={() => filterStatus = filterStatus === 'todo' ? '' : 'todo'}>
+              Todo
+            </button>
+            <button class="mobile-filter-button" class:active={filterStatus === 'in_progress'} on:click={() => filterStatus = filterStatus === 'in_progress' ? '' : 'in_progress'}>
+              In Progress
+            </button>
+            <button class="mobile-filter-button" class:active={filterStatus === 'done'} on:click={() => filterStatus = filterStatus === 'done' ? '' : 'done'}>
+              Done
+            </button>
+            <button class="mobile-sort-button" on:click={() => sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'} title={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}>
+              {#if sortOrder === 'asc'}
+                <SortAsc size="14" />
+              {:else}
+                <SortDesc size="14" />
+              {/if}
+            </button>
+            <button class="mobile-clear-button" on:click={clearAllFilters} title="Clear all filters">
+              Clear
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1799,6 +1865,227 @@
     /* Hide search icon on very small screens to save space */
     .search-icon {
       display: none;
+    }
+  }
+
+  /* Desktop Header */
+  .desktop-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 16px;
+  }
+
+  /* Mobile Header */
+  .mobile-header {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .mobile-header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .mobile-back-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .mobile-back-button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-focus);
+  }
+
+  .mobile-search-container {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-search-input {
+    width: 100%;
+    padding: 10px 35px 10px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 16px; /* Prevent zoom on iOS */
+    transition: all 0.2s ease;
+  }
+
+  .mobile-search-input:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  }
+
+  .mobile-search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-search-clear:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+  }
+
+  .mobile-mode-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .mobile-mode-toggle:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-focus);
+  }
+
+  .mobile-mode-toggle.active {
+    background: var(--border-focus);
+    border-color: var(--border-focus);
+    color: white;
+  }
+
+  .mobile-filters-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .mobile-filter-button {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .mobile-filter-button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-focus);
+  }
+
+  .mobile-filter-button.active {
+    background: var(--border-focus);
+    border-color: var(--border-focus);
+    color: white;
+  }
+
+  .mobile-sort-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 28px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .mobile-sort-button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-focus);
+  }
+
+  .mobile-clear-button {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .mobile-clear-button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-focus);
+  }
+
+  /* Override mobile styles */
+  @media (max-width: 768px) {
+    /* Hide desktop header on mobile */
+    .desktop-header {
+      display: none;
+    }
+
+    /* Show mobile header on mobile */
+    .mobile-header {
+      display: flex;
+    }
+
+    /* Hide desktop filters on mobile */
+    .filters-section {
+      display: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .mobile-filters-row {
+      gap: 4px;
+    }
+
+    .mobile-filter-button {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+
+    .mobile-clear-button {
+      padding: 4px 8px;
+      font-size: 11px;
     }
   }
 </style>

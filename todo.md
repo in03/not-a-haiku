@@ -65,6 +65,7 @@
   - [x] Editable tags (removable)
   - [ ] Add additional tags (search, create new)
   - [x] Edit, delete buttons
+    - [ ] Edit button in viewer modal doesn't work
   - [x] Add delete button 
 
 ### Visual Design
@@ -81,13 +82,17 @@
 - [ ] Overlapping playback on multiple presses. Don't know why this is so hard to fix.
 
 ### Mobile
-- [ ] Autocomplete seems to cause counting and validation issues.
-- [ ] Auto newline not triggering on mobile devices. 
+- [x] Autocomplete seems to cause counting and validation issues.
+- [x] Auto newline not triggering on mobile devices.
+- [x] Hide app feature bullets in footer on mobile and tablet.
+- [ ] Multi-select not available for mobile
 - [x] Responsiveness issues
  - [x] Worst for the grid view modal atm
 
 ## 🔄 System Integration
 
 ### Data Management
-- [x] **GitHub sync** - Resolve synchronization issues
+- [ ] **GitHub sync** - Resolve synchronization issues
+ - [ ] Sync works more like backup atm. No "unsynced remote" awareness until sync fires.
+ - [ ] Periodic sync logic missing.
 - [x] **Task status management** - Implement task status change functionality

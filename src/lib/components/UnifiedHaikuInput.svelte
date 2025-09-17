@@ -541,7 +541,7 @@
   
   // Reactive syllable counting (predictive, real-time)
   $: {
-    if (content !== undefined && step === 'content') {
+    if (content !== undefined && step === 'content' && !isMobileHandling) {
       updateSyllableCounts(content).catch(error => {
         console.error('Syllable counting error:', error);
         // Dispatch error to parent component
@@ -713,6 +713,138 @@
     }, 1000);
   }
   
+  // Detect mobile devices
+  let isMobile = false;
+  let isMobileHandling = false;
+  
+  // Check if device is mobile on mount
+  onMount(() => {
+    isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+               ('ontouchstart' in window) || 
+               (navigator.maxTouchPoints > 0);
+    
+    // Force mobile mode for testing (remove this when debugging is done)
+    // isMobile = true;
+    
+    // Mobile detection complete
+  });
+
+  // Track last processed content to detect changes
+  let lastProcessedContent = '';
+
+  // Mobile-specific input handling for autocomplete and auto newline
+  /** @param {Event & { currentTarget: EventTarget & HTMLTextAreaElement; }} event */
+  function handleInput(event) {
+    if (!isMobile || step !== 'content') return;
+    
+    // For mobile, we need to handle autocomplete changes retrospectively
+    // This runs after the input has been processed by the browser
+    setTimeout(async () => {
+      if (textareaElement) {
+        const newContent = textareaElement.value;
+        
+        if (newContent !== lastProcessedContent) {
+          isMobileHandling = true;
+          lastProcessedContent = newContent;
+          
+          // Update content first
+          content = newContent;
+          // Update syllable counts, then check for mobile logic
+          await updateSyllableCounts(newContent);
+          
+          // Now check for mobile-specific logic with updated syllable counts
+          await handleMobileLogic(newContent);
+          
+          isMobileHandling = false;
+        }
+      }
+    }, 0);
+  }
+
+  // Handle mobile-specific logic after syllable counts are updated
+  // This should only trigger on word boundaries, just like desktop
+  /** @param {string} text */
+  async function handleMobileLogic(text) {
+    if (!textareaElement) return;
+    
+    const cursorPos = textareaElement.selectionStart;
+    const currentLineIndex = getCurrentLineIndex(text, cursorPos);
+    
+    // Only check if we're within the poem structure
+    if (currentLineIndex >= maxLines) return;
+    
+    const expectedSyll = expectedSyllables[currentLineIndex];
+    const currentSyll = syllableCounts[currentLineIndex] || 0;
+    
+    // CRITICAL: Only check word boundaries, just like desktop
+    // Check if we just completed a word (text ends with space)
+    const justCompletedWord = text.endsWith(' ');
+    
+    if (!justCompletedWord) {
+      // Not at word boundary, skip mobile logic (matches desktop behavior)
+      return;
+    }
+    
+    // Now apply the same logic as desktop, but for mobile autocomplete scenarios
+    
+    // Check for over-limit after word completion
+    if (currentSyll > expectedSyll) {
+      if (settings.autoBackspace) {
+        handleOverLimit();
+        return;
+      } else {
+        if (settings.enableShake) {
+          shakeWindow();
+        }
+        return;
+      }
+    }
+    
+    // Check if we're at syllable limits and should auto newline
+    if (currentSyll === expectedSyll && currentLineIndex < maxLines - 1) {
+      // Insert newline after the space
+      const newContent = text + '\n';
+      content = newContent;
+      lastProcessedContent = newContent;
+      
+      setTimeout(() => {
+        textareaElement.setSelectionRange(newContent.length, newContent.length);
+      }, 0);
+    }
+  }
+
+  // Revert mobile input when over-limit and auto-backspace is disabled
+  /** @param {string} text @param {number} currentLineIndex */
+  function revertMobileInput(text, currentLineIndex) {
+    if (!textareaElement) return;
+    
+    // Find the last valid state before going over limit
+    const lines = text.split('\n');
+    const currentLine = lines[currentLineIndex] || '';
+    const words = currentLine.trim().split(/\s+/);
+    
+    if (words.length > 1) {
+      // Remove the last word that caused the over-limit
+      const validWords = words.slice(0, -1);
+      lines[currentLineIndex] = validWords.join(' ') + ' ';
+      const revertedContent = lines.join('\n');
+      
+      // Update content and cursor position
+      content = revertedContent;
+      setTimeout(() => {
+        const newCursorPos = revertedContent.length;
+        textareaElement.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    }
+  }
+
+  // Legacy function kept for compatibility
+  /** @param {string} text */
+  function checkMobileAutoNewline(text) {
+    // This is now handled by handleMobileLogic
+    return handleMobileLogic(text);
+  }
+
   // Handle keydown events with full HaikuEditor logic
   /** @param {KeyboardEvent} event */
   function handleKeydown(event) {
@@ -723,6 +855,42 @@
     }
     
     if (step !== 'content' || !textareaElement) return;
+    
+    // On mobile, let the input handler do most of the work
+    // Only handle essential keys like Enter and Backspace here
+    if (isMobile) {
+      // Handle Enter key for mobile - more forgiving than desktop
+      if (event.key === 'Enter') {
+        // If haiku is complete, submit it
+        if (validation.isValid && validation.isComplete) {
+          event.preventDefault();
+          handleHaikuSubmit();
+          return;
+        }
+        
+        // Otherwise, allow the newline but let mobile logic handle it afterwards
+        return;
+      }
+      
+      // Handle backspace to shrink back to title input
+      if (event.key === 'Backspace' && content.trim() === '') {
+        event.preventDefault();
+        step = 'title';
+        isExpanded = false;
+        
+        setTimeout(() => {
+          const titleInput = document.querySelector('.title-input');
+          if (titleInput) {
+            // @ts-ignore - focus method exists on input elements
+            titleInput.focus();
+          }
+        }, 0);
+        return;
+      }
+      
+      // Let other keys pass through to the input handler
+      return;
+    }
     
     // Block all input during the no-input period
     if (isInputBlocked) {
@@ -1036,6 +1204,7 @@
           bind:this={textareaElement}
           bind:value={content}
           on:keydown={handleKeydown}
+          on:input={handleInput}
           on:paste={handlePaste}
           on:click={dispatchCursorPosition}
           on:keyup={dispatchCursorPosition}
@@ -1044,6 +1213,8 @@
           class:has-highlight={highlightedWordIndex >= 0}
           rows={expectedLines}
           autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
           spellcheck="false"
           data-1p-ignore
           data-lpignore="true"

@@ -1,5 +1,6 @@
 import { authStore } from './stores/auth.js';
 import { haikuDB } from './stores/haiku-db.js';
+import { settingsStore } from './stores/settings.js';
 import { get } from 'svelte/store';
 
 /**
@@ -16,6 +17,13 @@ class GitHubSyncManager {
   constructor() {
     this.isSeeding = false;
     this.lastSyncTime = null;
+    this.syncInterval = null;
+    this.isSyncing = false;
+    this.remoteLastModified = null;
+    this.localLastModified = null;
+    this.hasUnsyncedRemote = false;
+    this.syncStatus = 'idle'; // 'idle' | 'syncing' | 'error' | 'success'
+    this.lastSyncError = null;
   }
 
   /**
@@ -311,7 +319,165 @@ class GitHubSyncManager {
   }
 
   /**
-   * Get sync status information
+   * Check for unsynced remote changes
+   * @returns {Promise<{hasUnsyncedRemote: boolean, remoteLastModified: number|null, localLastModified: number|null}>}
+   */
+  async checkForUnsyncedRemote() {
+    try {
+      if (!this.getAuthToken()) {
+        return { hasUnsyncedRemote: false, remoteLastModified: null, localLastModified: null };
+      }
+
+      const existingGist = await this.findHaikuGist();
+      if (!existingGist) {
+        this.hasUnsyncedRemote = false;
+        return { hasUnsyncedRemote: false, remoteLastModified: null, localLastModified: null };
+      }
+
+      // Get remote gist info
+      const gist = await this.getHaikuGist(existingGist.id);
+      const remoteLastModified = new Date(gist.updated_at).getTime();
+      this.remoteLastModified = remoteLastModified;
+
+      // Get local last modified time
+      const localHaikus = await haikuDB.getAll();
+      const localLastModified = localHaikus.length > 0 
+        ? Math.max(...localHaikus.map(h => h.updatedAt))
+        : 0;
+      this.localLastModified = localLastModified;
+
+      // Check if remote is newer than our last sync
+      const hasUnsyncedRemote = this.lastSyncTime 
+        ? remoteLastModified > this.lastSyncTime
+        : localHaikus.length > 0; // If we've never synced but have local data
+
+      this.hasUnsyncedRemote = hasUnsyncedRemote;
+
+      return {
+        hasUnsyncedRemote,
+        remoteLastModified,
+        localLastModified
+      };
+    } catch (error) {
+      console.error('Failed to check for unsynced remote:', error);
+      return { hasUnsyncedRemote: false, remoteLastModified: null, localLastModified: null };
+    }
+  }
+
+  /**
+   * Start periodic sync if enabled
+   */
+  startPeriodicSync() {
+    this.stopPeriodicSync(); // Clear any existing interval
+
+    const settings = get(settingsStore);
+    if (!settings.enableSync || !settings.autoSync || !this.getAuthToken()) {
+      return;
+    }
+
+    const intervalMs = settings.syncInterval * 60 * 1000; // Convert minutes to milliseconds
+    
+    this.syncInterval = setInterval(async () => {
+      if (!this.isSyncing) {
+        await this.sync();
+      }
+    }, intervalMs);
+
+    console.log(`Periodic sync started: every ${settings.syncInterval} minutes`);
+  }
+
+  /**
+   * Stop periodic sync
+   */
+  stopPeriodicSync() {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+      this.syncInterval = null;
+      console.log('Periodic sync stopped');
+    }
+  }
+
+  /**
+   * Initialize sync system
+   */
+  async initialize() {
+    const settings = get(settingsStore);
+    
+    if (!settings.enableSync || !this.getAuthToken()) {
+      return;
+    }
+
+    // Check for unsynced remote changes
+    await this.checkForUnsyncedRemote();
+
+    // Sync on startup if enabled
+    if (settings.syncOnStartup) {
+      await this.sync();
+    }
+
+    // Start periodic sync if enabled
+    this.startPeriodicSync();
+  }
+
+  /**
+   * Enhanced sync with status tracking
+   * @returns {Promise<{success: boolean, message: string, hasUnsyncedRemote?: boolean}>}
+   */
+  async sync() {
+    if (this.isSyncing) {
+      return { success: false, message: 'Sync already in progress' };
+    }
+
+    this.isSyncing = true;
+    this.syncStatus = 'syncing';
+    this.lastSyncError = null;
+
+    try {
+      if (!this.getAuthToken()) {
+        throw new Error('Not authenticated with GitHub');
+      }
+
+      // Check for unsynced remote changes first
+      const remoteCheck = await this.checkForUnsyncedRemote();
+
+      // First pull remote changes
+      const pullResult = await this.pullFromGitHub();
+      if (!pullResult.success) {
+        throw new Error(pullResult.message);
+      }
+
+      // Then push any local changes
+      const pushResult = await this.pushToGitHub();
+      if (!pushResult.success) {
+        throw new Error(pushResult.message);
+      }
+
+      this.syncStatus = 'success';
+      this.lastSyncTime = Date.now();
+      this.hasUnsyncedRemote = false;
+
+      return {
+        success: true,
+        message: 'Sync completed successfully',
+        hasUnsyncedRemote: false
+      };
+    } catch (error) {
+      console.error('Sync failed:', error);
+      this.syncStatus = 'error';
+      this.lastSyncError = error.message;
+      
+      return {
+        success: false,
+        message: `Sync failed: ${error.message}`,
+        hasUnsyncedRemote: this.hasUnsyncedRemote
+      };
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  /**
+   * Get comprehensive sync status information
    * @returns {Promise<Object>}
    */
   async getSyncStatus() {
@@ -320,13 +486,23 @@ class GitHubSyncManager {
       const syncedCount = localHaikus.filter(h => h.syncedAt).length;
       const existingGist = await this.findHaikuGist();
 
+      // Check for unsynced remote changes
+      const remoteCheck = await this.checkForUnsyncedRemote();
+
       return {
         totalLocal: localHaikus.length,
         synced: syncedCount,
         unsynced: localHaikus.length - syncedCount,
         hasRemoteGist: !!existingGist,
         gistId: existingGist?.id || null,
-        lastSyncTime: this.lastSyncTime
+        lastSyncTime: this.lastSyncTime,
+        hasUnsyncedRemote: this.hasUnsyncedRemote,
+        remoteLastModified: this.remoteLastModified,
+        localLastModified: this.localLastModified,
+        syncStatus: this.syncStatus,
+        isSyncing: this.isSyncing,
+        lastSyncError: this.lastSyncError,
+        periodicSyncActive: !!this.syncInterval
       };
     } catch (error) {
       console.error('Failed to get sync status:', error);
@@ -336,7 +512,14 @@ class GitHubSyncManager {
         unsynced: 0,
         hasRemoteGist: false,
         gistId: null,
-        lastSyncTime: null
+        lastSyncTime: null,
+        hasUnsyncedRemote: false,
+        remoteLastModified: null,
+        localLastModified: null,
+        syncStatus: 'error',
+        isSyncing: false,
+        lastSyncError: error.message,
+        periodicSyncActive: false
       };
     }
   }

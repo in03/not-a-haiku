@@ -10,7 +10,12 @@ export const defaultSettings = {
   ttsPauseDuration: 1.0, // Pause duration between lines in seconds (default 1 second)
   enableTaskTracking: false, // Enable task tracking for haikus (todo/in_progress/done)
   enableTTS: false, // Enable text-to-speech functionality
-  enableCritique: false // Enable AI analysis and critique
+  enableCritique: false, // Enable AI analysis and critique
+  enableSync: false, // Enable GitHub sync functionality
+  autoSync: false, // Enable automatic periodic sync
+  syncInterval: 30, // Sync interval in minutes (default 30 minutes)
+  syncOnStartup: true, // Sync when app starts
+  showSyncStatus: true // Show sync status in UI
 };
 
 

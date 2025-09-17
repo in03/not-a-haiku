@@ -53,6 +53,7 @@
 
 ### Onboarding
 - [ ] - Add a dismissable onboarding prompt for new users. Make it punchy, short, but flashy. Suggest sign in to GitHub for AI analysis and syncing benefits
+- [ ] Example / demo poems only include Haikus. Currently no examples for the other poem types. Either make types, or remove the examples when poemType != haiku.
 
 ### Layout & Navigation
 - [x] **Content centering** - Improve page layout balance
@@ -95,4 +96,5 @@
 - [ ] **GitHub sync** - Resolve synchronization issues
  - [ ] Sync works more like backup atm. No "unsynced remote" awareness until sync fires.
  - [ ] Periodic sync logic missing.
+ - [ ] Include syncing settings.
 - [x] **Task status management** - Implement task status change functionality

@@ -301,6 +301,84 @@
               </span>
             </label>
           </div>
+
+          <div class="setting-item">
+            <label class="toggle-label {isFeatureDisabled('sync') ? 'disabled' : ''}">
+              <input 
+                type="checkbox" 
+                bind:checked={settings.enableSync} 
+                class="toggle-input"
+                disabled={isFeatureDisabled('sync')}
+              />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">
+                <span class="toggle-title">Enable GitHub Sync</span>
+                <div class="setting-description">
+                  Sync your haikus to GitHub Gists for backup and cross-device access.
+                  {#if isFeatureDisabled('sync')}
+                    <span class="requirement-hint">Requires GitHub authentication</span>
+                  {:else}
+                    Your haikus will be stored in a private GitHub Gist.
+                  {/if}
+                </div>
+              </span>
+            </label>
+          </div>
+
+          {#if settings.enableSync && !isFeatureDisabled('sync')}
+            <div class="setting-group">
+              <h4 class="setting-subtitle">Sync Settings</h4>
+              
+              <div class="setting-item">
+                <label class="toggle-label">
+                  <input type="checkbox" bind:checked={settings.autoSync} class="toggle-input" />
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-text">
+                    <span class="toggle-title">Automatic Sync</span>
+                    <div class="setting-description">Automatically sync at regular intervals</div>
+                  </span>
+                </label>
+              </div>
+
+              {#if settings.autoSync}
+                <div class="setting-item">
+                  <label class="setting-label">Sync Interval (minutes)</label>
+                  <div class="input-group">
+                    <input 
+                      type="number" 
+                      bind:value={settings.syncInterval} 
+                      min="5" 
+                      max="1440" 
+                      class="setting-input"
+                    />
+                    <span class="input-suffix">minutes</span>
+                  </div>
+                </div>
+              {/if}
+
+              <div class="setting-item">
+                <label class="toggle-label">
+                  <input type="checkbox" bind:checked={settings.syncOnStartup} class="toggle-input" />
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-text">
+                    <span class="toggle-title">Sync on Startup</span>
+                    <div class="setting-description">Automatically sync when the app starts</div>
+                  </span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <label class="toggle-label">
+                  <input type="checkbox" bind:checked={settings.showSyncStatus} class="toggle-input" />
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-text">
+                    <span class="toggle-title">Show Sync Status</span>
+                    <div class="setting-description">Display sync status and notifications in the UI</div>
+                  </span>
+                </label>
+              </div>
+            </div>
+          {/if}
         </div>
       {/if}
 

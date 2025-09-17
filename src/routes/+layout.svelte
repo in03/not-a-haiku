@@ -10,6 +10,7 @@
   import HaikuGridView from '$lib/components/HaikuGridView.svelte';
   import confetti from 'canvas-confetti';
   import { getGitHubAuthUrl, generateState, isOAuthAvailable } from '$lib/auth/github.js';
+  import { gitHubSync } from '$lib/github-sync.js';
   let isMenuOpen = false;
   
   
@@ -17,6 +18,10 @@
   let showGridView = false;
   let viewerOpen = false;
   let allHaikus = [];
+
+  // Sync state
+  let syncStatus = null;
+  let showSyncStatus = false;
 
   function openMenu() { isMenuOpen = true; }
   function closeMenu() { isMenuOpen = false; }
@@ -81,6 +86,45 @@
     }
   }
   
+  // Initialize sync system
+  async function initializeSync() {
+    if ($settingsStore.enableSync && $authStore.isAuthenticated) {
+      try {
+        await gitHubSync.initialize();
+        await updateSyncStatus();
+      } catch (error) {
+        console.error('Failed to initialize sync:', error);
+      }
+    }
+  }
+
+  // Update sync status
+  async function updateSyncStatus() {
+    if ($settingsStore.enableSync && $authStore.isAuthenticated) {
+      try {
+        syncStatus = await gitHubSync.getSyncStatus();
+        showSyncStatus = $settingsStore.showSyncStatus;
+      } catch (error) {
+        console.error('Failed to get sync status:', error);
+      }
+    }
+  }
+
+  // Manual sync function
+  async function manualSync() {
+    if ($settingsStore.enableSync && $authStore.isAuthenticated) {
+      try {
+        const result = await gitHubSync.sync();
+        await updateSyncStatus();
+        return result;
+      } catch (error) {
+        console.error('Manual sync failed:', error);
+        return { success: false, message: error.message };
+      }
+    }
+    return { success: false, message: 'Sync not enabled or not authenticated' };
+  }
+
   // Confetti celebration function
   function triggerConfetti() {
     if ($settingsStore.enableConfetti) {
@@ -107,10 +151,23 @@
     // Add event listeners
     document.addEventListener('keydown', handleKeydown);
     
+    // Initialize sync system
+    initializeSync();
+    
     return () => {
       document.removeEventListener('keydown', handleKeydown);
     };
   });
+
+  // Reactive statements for sync
+  $: if ($settingsStore.enableSync && $authStore.isAuthenticated) {
+    updateSyncStatus();
+  }
+
+  $: if (!$settingsStore.enableSync || !$authStore.isAuthenticated) {
+    syncStatus = null;
+    showSyncStatus = false;
+  }
   
   // Handle GitHub sign in
   function handleGitHubSignIn() {
@@ -167,6 +224,21 @@
         </div>
         <div class="navbar-end flex items-center gap-2">
           <nav class="hidden sm:flex items-center gap-2">
+            <!-- Sync Status Indicator -->
+            {#if showSyncStatus && syncStatus}
+              <div class="sync-status-indicator" title="Sync Status">
+                {#if syncStatus.isSyncing}
+                  <div class="sync-spinner"></div>
+                {:else if syncStatus.hasUnsyncedRemote}
+                  <div class="sync-warning" title="Unsynced remote changes available">⚠️</div>
+                {:else if syncStatus.syncStatus === 'error'}
+                  <div class="sync-error" title="Sync error: {syncStatus.lastSyncError}">❌</div>
+                {:else if syncStatus.syncStatus === 'success'}
+                  <div class="sync-success" title="Last sync: {new Date(syncStatus.lastSyncTime).toLocaleString()}">✅</div>
+                {/if}
+              </div>
+            {/if}
+
             <a href="{base}/settings" class="btn btn-sm btn-ghost" aria-label="Settings" title="Settings">
               <SettingsIcon class="w-4 h-4" />
             </a>
@@ -429,5 +501,45 @@
     color: #3b82f6;
   }
 
+  /* Sync Status Indicator */
+  .sync-status-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--bg-secondary, #f8fafc);
+    border: 1px solid var(--border-color, #e2e8f0);
+  }
+
+  .sync-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color, #e2e8f0);
+    border-top: 2px solid var(--primary, #3b82f6);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .sync-warning {
+    font-size: 16px;
+    color: #f59e0b;
+  }
+
+  .sync-error {
+    font-size: 16px;
+    color: #ef4444;
+  }
+
+  .sync-success {
+    font-size: 16px;
+    color: #10b981;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
 
 </style>

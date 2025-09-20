@@ -1,26 +1,28 @@
 # 🚫 Not a Haiku 🍃
 
-> #ForTheLoveOfCode
+A haiku writing app that validates syllable count in real-time and helps you turn tasks into poetry.
 
-Not great at haikus?
+`#ForTheLoveOfCode`
 
-No problem!
+**Live at: [haiku.trevatt.co](https://haiku.trevatt.co)**
 
-> Not-a-Haiku is an interactive haiku validator with real-time syllable validation using a hybrid ML + dictionary approach.
+## What It Does
+
+*Not a Haiku* helps you write haikus (or other syllable-constrained poetry). It validates syllable count in real-time using fast dictionary lookup combined with a tiny client-side neural model. It also rates, critiques and tags your haikus using AI analysis powered by GitHub models.
 
 ## Features
 
 - 🎯 **Real-time syllable counting** - Instant feedback as you type
 - 🤖 **ONNX ML Model** - 95.82% accurate syllable prediction for unknown words
 - 📖 **CMU Dictionary** - 126K+ words with 100% accurate syllable counts  
-- 🎊 **Dynamic UI** - Title changes from "Not a Haiku" to "It's a Haiku!" with confetti
-- ✨ **Auto line breaks** - Automatically moves to next line at syllable limits
-- 🔄 **Smart backspace** - Removes invalid words when over syllable count
-- 💫 **Shake feedback** - Visual indication when syllable limits are exceeded
-- 📱 **Works offline** - No server required, pure client-side
-- 🎉 **Celebration effects** - Confetti to increase self esteem
+- 🧠 **AI Analysis** - Rate, critique and categorize your poems using GitHub Models
+- 🏷️ **Smart Tagging** - Automatic categorization and task tracking
+- 🔍 **Content Management** - Search, edit, and organize your haikus
+- ✨ **Multiple Poem Types** - Haiku, Tanka, Cinquain, Nonet, Etheree
+- 🔄 **GitHub Sync** - Backup and sync across devices using GitHub Gist
+- 🎉 **Celebration effects** - Confetti ofc
 
-## 🚀 Quick Start
+## Development
 
 ```bash
 # Install dependencies
@@ -38,7 +40,6 @@ pnpm build
 ### Syllable Counting Strategy
 - **Complete words**: CMU Dictionary lookup (100% accurate)
 - **Partial/Unknown words**: ONNX neural network (95.82% accurate)
-- **Fallback**: Basic vowel counting if ML fails
 
 ### Performance
 - **Dictionary**: ~2MB compressed JSON (126K words)
@@ -61,7 +62,7 @@ pnpm build
 
 ## 🌐 Deployment
 
-This project is configured for GitHub Pages deployment. The GitHub Actions workflow will automatically build and deploy on every push to main.
+This project is configured via Vercel. With some work and some potentially limited features, deployment via GitHub Pages should also be possible using the static adapter.
 
 ### Manual Deployment
 ```bash
@@ -71,9 +72,6 @@ pnpm build
 # The build output will be in the `build/` directory
 ```
 
-## 🧪 Testing
-
-Visit `/test-onnx` to test the ONNX syllable counter functionality.
 
 ## 📝 License
 

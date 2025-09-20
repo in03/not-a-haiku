@@ -166,19 +166,17 @@
   $: poemArticle = articleFor(poemNameLower);
   
   // Initialize auth store on mount
-  onMount(() => {
-    authStore.init();
+  onMount(async () => {
+    await authStore.init();
     
     // Add event listeners
     document.addEventListener('keydown', handleKeydown);
     
     // Initialize sync system
     initializeSync();
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeydown);
-    };
   });
+  
+  // Note: Event listener cleanup is handled by the browser when the page unloads
 
   // Reactive statements for sync
   $: if ($settingsStore.enableSync && $authStore.isAuthenticated) {

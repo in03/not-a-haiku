@@ -37,7 +37,7 @@ function safeGetStoredSettings() {
       }
     }
   } catch (err) {
-    // Ignore storage errors
+    console.warn('Failed to load settings from localStorage:', err);
   }
   return { ...defaultSettings };
 }

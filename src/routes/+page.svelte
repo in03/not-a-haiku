@@ -78,21 +78,15 @@
     });
 
     // Show onboarding modal for new users
-    if (!$settingsStore.hasSeenOnboarding && !$authStore.isAuthenticated) {
-      showOnboarding = true;
-    }
+    // Note: We'll use a reactive statement to handle auth store initialization timing
 
     // Listen for clear editor events from the site title
-    const handleClearEditor = () => {
-      clearEditorState();
-    };
-    
     document.addEventListener('clearEditor', handleClearEditor);
-    
-    // Return cleanup function for onDestroy
-    onDestroy(() => {
-      document.removeEventListener('clearEditor', handleClearEditor);
-    });
+  });
+  
+  // Cleanup on destroy
+  onDestroy(() => {
+    document.removeEventListener('clearEditor', handleClearEditor);
   });
   
   let title = '';
@@ -121,6 +115,7 @@
 
   // Onboarding modal state
   let showOnboarding = false;
+  let onboardingChecked = false;
   /** @type {any} */
   let unifiedInputComponent;
   /** @type {HTMLDivElement | null} */
@@ -145,6 +140,33 @@
       hasSeenOnboarding: true
     }));
   }
+
+  // Debug function to manually trigger onboarding (localhost only)
+  function debugTriggerOnboarding() {
+    settingsStore.update(settings => ({
+      ...settings,
+      hasSeenOnboarding: false
+    }));
+    showOnboarding = true;
+  }
+
+  // Debug function to reset onboarding state (localhost only)
+  function debugResetOnboarding() {
+    settingsStore.update(settings => ({
+      ...settings,
+      hasSeenOnboarding: false
+    }));
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('app-settings');
+    }
+    // Reload the page to reinitialize stores
+    window.location.reload();
+  }
+
+  // Clear editor event handler
+  const handleClearEditor = () => {
+    clearEditorState();
+  };
 
   // Clear all editor state
   function clearEditorState() {
@@ -435,6 +457,15 @@
   $: poemArticle = articleFor(poemNameLower);
   
   // Auth is initialized in layout
+  
+  // Reactive statement to check onboarding when auth store is ready
+  $: if (!$authStore.isLoading && !onboardingChecked) {
+    onboardingChecked = true;
+    
+    if (!$settingsStore.hasSeenOnboarding && !$authStore.isAuthenticated) {
+      showOnboarding = true;
+    }
+  }
   
   // no decorative leaves
   
@@ -837,6 +868,20 @@
   bind:isOpen={showOnboarding}
   on:close={handleOnboardingClose}
 />
+
+<!-- Debug controls (only show in development) -->
+{#if typeof window !== 'undefined' && window.location.hostname === 'localhost'}
+  <div style="position: fixed; top: 10px; right: 10px; z-index: 1000; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 5px; font-size: 12px;">
+    <div>Debug Controls:</div>
+    <button on:click={debugTriggerOnboarding} style="margin: 2px; padding: 4px 8px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">Show Onboarding</button>
+    <button on:click={debugResetOnboarding} style="margin: 2px; padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">Reset Onboarding</button>
+    <div style="margin-top: 5px; font-size: 10px;">
+      hasSeen: {$settingsStore.hasSeenOnboarding}<br>
+      isAuth: {$authStore.isAuthenticated}<br>
+      showOnboarding: {showOnboarding}
+    </div>
+  </div>
+{/if}
 
 <style>
   @keyframes fade-in {

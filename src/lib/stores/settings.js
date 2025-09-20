@@ -1,21 +1,22 @@
 import { writable } from 'svelte/store';
 
 export const defaultSettings = {
-  autoBackspace: false,
+  autoBackspace: true,
   enableShake: true,
   enableConfetti: true,
   poemType: 'haiku',
-  showProgressBar: false,
+  showProgressBar: true,
   elevenlabsApiKey: '', // ElevenLabs API key for text-to-speech
   ttsPauseDuration: 1.0, // Pause duration between lines in seconds (default 1 second)
   enableTaskTracking: false, // Enable task tracking for haikus (todo/in_progress/done)
   enableTTS: false, // Enable text-to-speech functionality
   enableCritique: false, // Enable AI analysis and critique
-  enableSync: false, // Enable GitHub sync functionality
-  autoSync: false, // Enable automatic periodic sync
+  enableSync: true, // Enable GitHub sync functionality
+  autoSync: true, // Enable automatic periodic sync
   syncInterval: 30, // Sync interval in minutes (default 30 minutes)
   syncOnStartup: true, // Sync when app starts
-  showSyncStatus: true // Show sync status in UI
+  showSyncStatus: false, // Show sync status in UI
+  hasSeenOnboarding: false // Whether user has seen the onboarding modal
 };
 
 

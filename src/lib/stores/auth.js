@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
+import { settingsStore } from './settings.js';
 
 /**
  * Authentication state structure
@@ -112,6 +113,14 @@ function createAuthStore() {
         error: null
       };
       saveAuthState(newState);
+      
+      // Auto-enable GitHub-related features when user signs in
+      settingsStore.update(settings => ({
+        ...settings,
+        enableSync: true,
+        enableCritique: true
+      }));
+      
       return newState;
     }),
     

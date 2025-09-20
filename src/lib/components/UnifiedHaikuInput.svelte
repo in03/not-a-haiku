@@ -1121,6 +1121,12 @@
     // The reactive statement will automatically handle syllable counting and validation
     // when content changes, so no need to manually trigger it
   }
+
+  // Force expansion to content editing step
+  export function expandToContent() {
+    step = 'content';
+    isExpanded = true;
+  }
   
   // Note: Syllable counter initialization is handled by the parent component
   

@@ -49,15 +49,36 @@ export function getPoemType(key) {
 }
 
 /**
- * Get all poem type keys
+ * Detect poem type from content based on number of lines
+ * @param {string} content - The poem content
+ * @returns {string} The detected poem type key
  */
-export function getPoemTypeKeys() {
-  return Object.keys(poemTypes);
-}
-
-/**
- * Get all poem types as entries
- */
-export function getPoemTypeEntries() {
-  return Object.entries(poemTypes);
+export function detectPoemType(content) {
+  if (!content || !content.trim()) {
+    return 'haiku'; // Default
+  }
+  
+  const lines = content.split('\n').filter(line => line.trim().length > 0);
+  const lineCount = lines.length;
+  
+  // Find poem types that match the line count
+  const matchingTypes = Object.entries(poemTypes).filter(([, type]) => 
+    type.syllables.length === lineCount
+  );
+  
+  if (matchingTypes.length === 0) {
+    return 'haiku'; // Default fallback
+  }
+  
+  // If multiple matches, prefer based on order of preference
+  const preferenceOrder = ['haiku', 'tanka', 'cinquain', 'shadorma', 'nonet', 'etheree', 'etheree_desc'];
+  
+  for (const preferred of preferenceOrder) {
+    if (matchingTypes.some(([key]) => key === preferred)) {
+      return preferred;
+    }
+  }
+  
+  // Return the first match if no preference found
+  return matchingTypes[0][0];
 }

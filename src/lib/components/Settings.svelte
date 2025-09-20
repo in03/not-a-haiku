@@ -9,7 +9,7 @@
   
   export let isOpen = false;
   export let isModal = true; // New prop to control modal vs inline behavior
-  // @ts-ignore - allow shape extension from store
+  /** @type {any} */
   export let settings = {
     autoBackspace: true,
     enableShake: true,
@@ -20,7 +20,13 @@
     ttsPauseDuration: 1.0,
     enableTaskTracking: false,
     enableTTS: false,
-    enableCritique: false
+    enableCritique: false,
+    enableSync: true,
+    autoSync: true,
+    syncInterval: 30,
+    syncOnStartup: true,
+    showSyncStatus: false,
+    hasSeenOnboarding: false
   };
 
   let activeTab = 'editor';
@@ -302,83 +308,6 @@
             </label>
           </div>
 
-          <div class="setting-item">
-            <label class="toggle-label {isFeatureDisabled('sync') ? 'disabled' : ''}">
-              <input 
-                type="checkbox" 
-                bind:checked={settings.enableSync} 
-                class="toggle-input"
-                disabled={isFeatureDisabled('sync')}
-              />
-              <span class="toggle-slider"></span>
-              <span class="toggle-text">
-                <span class="toggle-title">Enable GitHub Sync</span>
-                <div class="setting-description">
-                  Sync your haikus to GitHub Gists for backup and cross-device access.
-                  {#if isFeatureDisabled('sync')}
-                    <span class="requirement-hint">Requires GitHub authentication</span>
-                  {:else}
-                    Your haikus will be stored in a private GitHub Gist.
-                  {/if}
-                </div>
-              </span>
-            </label>
-          </div>
-
-          {#if settings.enableSync && !isFeatureDisabled('sync')}
-            <div class="setting-group">
-              <h4 class="setting-subtitle">Sync Settings</h4>
-              
-              <div class="setting-item">
-                <label class="toggle-label">
-                  <input type="checkbox" bind:checked={settings.autoSync} class="toggle-input" />
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-text">
-                    <span class="toggle-title">Automatic Sync</span>
-                    <div class="setting-description">Automatically sync at regular intervals</div>
-                  </span>
-                </label>
-              </div>
-
-              {#if settings.autoSync}
-                <div class="setting-item">
-                  <label class="setting-label">Sync Interval (minutes)</label>
-                  <div class="input-group">
-                    <input 
-                      type="number" 
-                      bind:value={settings.syncInterval} 
-                      min="5" 
-                      max="1440" 
-                      class="setting-input"
-                    />
-                    <span class="input-suffix">minutes</span>
-                  </div>
-                </div>
-              {/if}
-
-              <div class="setting-item">
-                <label class="toggle-label">
-                  <input type="checkbox" bind:checked={settings.syncOnStartup} class="toggle-input" />
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-text">
-                    <span class="toggle-title">Sync on Startup</span>
-                    <div class="setting-description">Automatically sync when the app starts</div>
-                  </span>
-                </label>
-              </div>
-
-              <div class="setting-item">
-                <label class="toggle-label">
-                  <input type="checkbox" bind:checked={settings.showSyncStatus} class="toggle-input" />
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-text">
-                    <span class="toggle-title">Show Sync Status</span>
-                    <div class="setting-description">Display sync status and notifications in the UI</div>
-                  </span>
-                </label>
-              </div>
-            </div>
-          {/if}
         </div>
       {/if}
 
@@ -437,6 +366,84 @@
 
       <!-- Sync Tab -->
       {#if activeTab === 'sync'}
+        <div class="setting-group">
+          <h3 class="setting-label">Sync Settings</h3>
+          
+          <div class="setting-item">
+            <label class="toggle-label {isFeatureDisabled('sync') ? 'disabled' : ''}">
+              <input 
+                type="checkbox" 
+                bind:checked={settings.enableSync} 
+                class="toggle-input"
+                disabled={isFeatureDisabled('sync')}
+              />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">
+                <span class="toggle-title">Enable GitHub Sync</span>
+                <div class="setting-description">
+                  Sync your haikus to GitHub Gists for backup and cross-device access.
+                  {#if isFeatureDisabled('sync')}
+                    <span class="requirement-hint">Requires GitHub authentication</span>
+                  {:else}
+                    Your haikus will be stored in a private GitHub Gist.
+                  {/if}
+                </div>
+              </span>
+            </label>
+          </div>
+
+          {#if settings.enableSync && !isFeatureDisabled('sync')}
+            <div class="setting-item">
+              <label class="toggle-label">
+                <input type="checkbox" bind:checked={settings.autoSync} class="toggle-input" />
+                <span class="toggle-slider"></span>
+                <span class="toggle-text">
+                  <span class="toggle-title">Automatic Sync</span>
+                  <div class="setting-description">Automatically sync at regular intervals</div>
+                </span>
+              </label>
+            </div>
+
+            {#if settings.autoSync}
+              <div class="setting-item">
+                <div class="range-label">
+                  <span class="range-title">Sync Interval</span>
+                  <div class="setting-description">How often to automatically sync your haikus</div>
+                  <div class="range-input-container">
+                    <input 
+                      type="range"
+                      class="range-input"
+                      bind:value={settings.syncInterval}
+                      min="5"
+                      max="1440"
+                      step="5"
+                    />
+                    <div class="range-value">
+                      {settings.syncInterval}m
+                    </div>
+                  </div>
+                  <div class="range-marks">
+                    <span>5m</span>
+                    <span>720m</span>
+                    <span>1440m</span>
+                  </div>
+                </div>
+              </div>
+            {/if}
+
+            <div class="setting-item">
+              <label class="toggle-label">
+                <input type="checkbox" bind:checked={settings.syncOnStartup} class="toggle-input" />
+                <span class="toggle-slider"></span>
+                <span class="toggle-text">
+                  <span class="toggle-title">Sync on Startup</span>
+                  <div class="setting-description">Automatically sync when the app starts</div>
+                </span>
+              </label>
+            </div>
+          {/if}
+        </div>
+
         <div class="setting-group">
           <h3 class="setting-label">Storage & Sync</h3>
           
@@ -552,15 +559,15 @@
                 <div class="github-user-card">
                   <div class="github-user-info">
                     <img 
-                      src={/** @type {any} */($authStore.user)?.avatar_url} 
-                      alt={/** @type {any} */($authStore.user)?.name || /** @type {any} */($authStore.user)?.login}
+                      src={(/** @type {any} */($authStore.user))?.avatar_url} 
+                      alt={(/** @type {any} */($authStore.user))?.name || (/** @type {any} */($authStore.user))?.login}
                       class="github-avatar"
                     />
                     <div class="github-user-details">
                       <div class="github-user-name">
-                        {/** @type {any} */($authStore.user)?.name || /** @type {any} */($authStore.user)?.login}
+                        {(/** @type {any} */($authStore.user))?.name || (/** @type {any} */($authStore.user))?.login}
                       </div>
-                      <div class="github-user-login">@{/** @type {any} */($authStore.user)?.login}</div>
+                      <div class="github-user-login">@{(/** @type {any} */($authStore.user))?.login}</div>
                     </div>
                   </div>
                   <button 

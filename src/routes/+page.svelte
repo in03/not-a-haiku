@@ -6,14 +6,15 @@
   import AnalysisResults from '$lib/components/AnalysisResults.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import ModelErrorModal from '$lib/components/ModelErrorModal.svelte';
+  import OnboardingModal from '$lib/components/OnboardingModal.svelte';
   import { settingsStore } from '$lib/stores/settings.js';
   import { authStore } from '$lib/stores/auth.js';
   import { haikuStore } from '$lib/stores/haiku-db.js';
-  import { poemTypes } from '$lib/poemTypes.js';
+  import { poemTypes, detectPoemType } from '$lib/poemTypes.js';
   import { analyzeHaiku } from '$lib/github-models.js';
   import { initializeSyllableCounter } from '$lib/onnx-syllable-counter.js';
   import confetti from 'canvas-confetti';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   
   // Initialize syllable counter on mount
   onMount(async () => {
@@ -37,11 +38,29 @@
           // Load the haiku for editing
           title = haiku.title || '';
           content = haiku.content || '';
+          
+          // Detect poem type from content and temporarily switch to it
+          const detectedPoemType = detectPoemType(content);
+          if (detectedPoemType !== $settingsStore.poemType) {
+            console.log(`Detected poem type: ${detectedPoemType}, switching from ${$settingsStore.poemType}`);
+            // Temporarily update the settings store for editing
+            settingsStore.update(settings => ({
+              ...settings,
+              poemType: detectedPoemType
+            }));
+          }
+          
           // Clear the session storage
           sessionStorage.removeItem('editHaiku');
-          // Update the input component
+          
+          // Update the input component after a tick to ensure settings are applied
+          await tick();
           if (unifiedInputComponent) {
             unifiedInputComponent.updateContent(content);
+            // Force the component to expand to content step if there's content
+            if (content.trim()) {
+              unifiedInputComponent.expandToContent();
+            }
           }
         } catch (error) {
           console.error('Failed to parse edit haiku data:', error);
@@ -56,6 +75,23 @@
         modelError = event.error;
         showModelError = true;
       }
+    });
+
+    // Show onboarding modal for new users
+    if (!$settingsStore.hasSeenOnboarding && !$authStore.isAuthenticated) {
+      showOnboarding = true;
+    }
+
+    // Listen for clear editor events from the site title
+    const handleClearEditor = () => {
+      clearEditorState();
+    };
+    
+    document.addEventListener('clearEditor', handleClearEditor);
+    
+    // Return cleanup function for onDestroy
+    onDestroy(() => {
+      document.removeEventListener('clearEditor', handleClearEditor);
     });
   });
   
@@ -82,6 +118,9 @@
   let showModelError = false;
   /** @type {Error | null} */
   let modelError = null;
+
+  // Onboarding modal state
+  let showOnboarding = false;
   /** @type {any} */
   let unifiedInputComponent;
   /** @type {HTMLDivElement | null} */
@@ -93,9 +132,61 @@
   let showAnalysis = false;
   
   // Current haiku ID for updating with analysis
+  /** @type {string | null} */
   let currentHaikuId = null;
   let isAnalyzing = false;
   let isEditingHaiku = false;
+  
+  // Handle onboarding modal close
+  function handleOnboardingClose() {
+    showOnboarding = false;
+    settingsStore.update(settings => ({
+      ...settings,
+      hasSeenOnboarding: true
+    }));
+  }
+
+  // Clear all editor state
+  function clearEditorState() {
+    // Reset all form variables
+    title = '';
+    content = '';
+    validation = { isValid: false, isComplete: false, feedback: '' };
+    syllableCounts = [];
+    expectedSyllables = [];
+    
+    // Reset debounced UI state
+    debouncedValidation = { isValid: false, isComplete: false, feedback: '' };
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+      validationTimeout = null;
+    }
+    progressBarValue = 0;
+    progressBarTarget = 0;
+    
+    // Reset analysis state
+    analysis = null;
+    showAnalysis = false;
+    currentHaikuId = null;
+    isAnalyzing = false;
+    isEditingHaiku = false;
+    
+    // Reset toast state
+    showToast = false;
+    toastMessage = '';
+    toastType = 'info';
+    celebrationIndex = 0;
+    
+    // Reset the unified input component (this handles most of the state)
+    if (unifiedInputComponent) {
+      unifiedInputComponent.reset();
+    }
+    
+    // Clear any session storage edit data
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('editHaiku');
+    }
+  }
   
   // Function to start a new haiku
   function startNewHaiku() {
@@ -152,8 +243,9 @@
     }, 100);
   }
   
-  // All available haiku templates
-  const allHaikuTemplates = [
+  // All available poem templates organized by type
+  const poemTemplates = {
+    haiku: [
     {
       id: 'lamenting-chores',
       title: '😔 lamenting chores',
@@ -183,43 +275,127 @@
       id: 'autocorrect-fail',
       title: '📱 autocorrect fail',
       content: 'Autocorrect strikes\nChanging words I never meant\nMessages confused'
-    },
-    {
-      id: 'procrastination',
-      title: '⏰ procrastination',
-      content: 'I\'ll do it later\nFamous last words of my life\nDeadline approaches'
-    },
-    {
-      id: 'social-media',
-      title: '📺 social media',
-      content: 'Endless scrolling down\nWatching other people\'s lives\nWhere did my day go?'
-    }
-  ];
+      }
+    ],
+    tanka: [
+      {
+        id: 'coding-life',
+        title: '💻 coding life',
+        content: 'Debug at midnight\nCoffee cold, but spirit warm\nOne more try might work\nStack Overflow saves the day\nCommit and push to master'
+      },
+      {
+        id: 'grocery-run',
+        title: '🛒 grocery run',
+        content: 'Make a shopping list\nForget it on kitchen desk\nWander aisles confused\nBuy random things that look good\nStill need milk but forgot it'
+      },
+      {
+        id: 'exercise-goals',
+        title: '🏃 exercise goals',
+        content: 'New resolution\nSigned up to the gym again\nJanuary aight\nFebruary went okay\nMarch finds me back on the couch'
+      }
+    ],
+    cinquain: [
+      {
+        id: 'coffee-break',
+        title: '☕ coffee break',
+        content: 'Working\nMeeting drags on\nNeed caffeine boost right now\nEscape to kitchen for quick fix\nAwake'
+      },
+      {
+        id: 'plant-care',
+        title: '🌱 plant care',
+        content: 'Greenish\nLeaves are wilting...\nForgot to water! Dang\nSorry little plant friend of mine\Forgive?'
+      },
+      {
+        id: 'deadline-stress',
+        title: '⏰ deadline stress',
+        content: 'Rushhhhing!\nPanic sets in\nDeadline is tomorrow\nWhy did I leave this so late, man?\nI\'m doomed'
+      }
+    ],
+    nonet: [
+      {
+        id: 'morning-routine',
+        title: '🌅 morning routine',
+        content: 'Alarm clock beeping at seven AM.\nMash the snooze button a few times.\nThe coffee machine starts up.\nGet the toothbrush buzzing.\nShower water pours.\nToast is golden\nKeys in hand.\nGet out.\nGo!'
+      },
+      {
+        id: 'weekend-plans',
+        title: '🛋️ weekend plans',
+        content: 'Saturday morning, I\'ve got big plans:\nClean the house, tidy the garage,\ncall my parents and catch up,\nmaybe I\'ll go shopping,\nthen watch a movie,\neat some pizza!\nnap a bit...\nSounds good.\nYeah.'
+      },
+    ],
+    shadorma: [
+      {
+        id: 'tax-season',
+        title: '📊 tax season',
+        content: 'Receipts lost\nForms spread everywhere\nCalculate\nDeductions\nAccountant calls with bad news\nI owe more money'
+      },
+      {
+        id: 'pet-care',
+        title: '🐕 pet care',
+        content: 'Dog walking\nThree times daily now\nRaining hard\nBut still must\nPut on boots and grab the leash\nGood boy, fluffy dog'
+      },
+      {
+        id: 'social-plans',
+        title: '📱 social plans',
+        content: 'Ping group chat\nMake some dinner plans\nChoose a place\nSuch chaos\nEveryone votes differently\nJust stay home instead'
+      }
+    ],
+    etheree: [
+      {
+        id: 'productivity',
+        title: '📈 productivity',
+        content: 'Start!\nTry hard...\nPut in work.\nMake solid plans\nOrganize my desk\nOpen laptop ready\nCheck email first then socials\nSuddenly three hours have passed\nWhat the actual heck just happened\nGuess I need to stay back til late tonight'
+      },
+      {
+        id: 'vacation-prep',
+        title: '✈️ vacation prep',
+        content: 'Yay!\nPack bags\nMake a list\nPassport, tickets\nWeather forecast\'s dece\nExcitement building up\nDouble check everything, twice\nMissing phone charger and toothbrush\nHow does this happen every time!\nI\'ll buy them when I get to the airport...'
+      }
+    ],
+    etheree_desc: [
+      {
+        id: 'cooking-dinner',
+        title: '🍳 cooking dinner',
+        content: "Recipe with many ingredients\nPrepare vegetables and measure spice\nHeat oil while checking the cookbook\nSuddenly, something's burning\nSmoke alarm going off\nOpen all windows\nOrder takeout\nCleanup mess\nTasty!\n(soup)"
+      },
+      {
+        id: 'home-improvement',
+        title: '🔨 home improvement',
+        content: 'Weekend project seemed simple in the store\nRead instructions carefully three times\nGather tools and lay out the parts\nRealize missing some screws\nDrive back to hardware store\nGot parts, still confused\nCall smart neighbor\nStill takes long\nFar out...\nDone.'
+      }
+    ]
+  };
 
   // Current random selection of 3 templates
+  /** @type {Array<{id: string, title: string, content: string}>} */
   let currentTemplates = [];
   
-  // Function to get 3 random templates
+  // Function to get 3 random templates for current poem type
   function getRandomTemplates() {
-    const shuffled = [...allHaikuTemplates].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, 3);
+    const currentPoemType = $settingsStore.poemType || 'haiku';
+    const availableTemplates = poemTemplates[/** @type {keyof typeof poemTemplates} */(currentPoemType)] || poemTemplates.haiku;
+    const shuffled = [...availableTemplates].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, Math.min(3, availableTemplates.length));
   }
   
   // Initialize with random templates
   currentTemplates = getRandomTemplates();
   
-  // Track previous content state to detect when templates should refresh
+  // Track previous content state and poem type to detect when templates should refresh
   let previousContentEmpty = true;
+  let previousPoemType = $settingsStore.poemType;
   
-  // Refresh templates when content becomes empty again
-  $: if (!content.trim() && !previousContentEmpty) {
+  // Refresh templates when content becomes empty again or poem type changes
+  $: if ((!content.trim() && !previousContentEmpty) || $settingsStore.poemType !== previousPoemType) {
     currentTemplates = getRandomTemplates();
     previousContentEmpty = true;
+    previousPoemType = $settingsStore.poemType;
   } else if (content.trim()) {
     previousContentEmpty = false;
   }
   
   // Template selection handler
+  /** @param {{ id: string, title: string, content: string }} template */
   function selectTemplate(template) {
     if (unifiedInputComponent) {
       unifiedInputComponent.reset();
@@ -393,7 +569,7 @@
             toastType = 'success';
             
             // Update the saved haiku with analysis results
-            if (currentHaikuId) {
+            if (currentHaikuId && analysis) {
               try {
                 await haikuStore.update(currentHaikuId, {
                   tags: analysis.tags, // Copy suggested tags to main tags field
@@ -416,7 +592,7 @@
             toastType = 'warning';
             
             // Update the saved haiku with fallback analysis
-            if (currentHaikuId) {
+            if (currentHaikuId && analysis) {
               try {
                 await haikuStore.update(currentHaikuId, {
                   tags: analysis.tags, // Copy suggested tags to main tags field
@@ -654,6 +830,12 @@
 <ModelErrorModal
   bind:isOpen={showModelError}
   error={modelError}
+/>
+
+<!-- Onboarding Modal -->
+<OnboardingModal
+  bind:isOpen={showOnboarding}
+  on:close={handleOnboardingClose}
 />
 
 <style>

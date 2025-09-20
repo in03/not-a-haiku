@@ -17,11 +17,10 @@
   // Grid view state
   let showGridView = false;
   let viewerOpen = false;
+  /** @type {any[]} */
   let allHaikus = [];
 
   // Sync state
-  let syncStatus = null;
-  let showSyncStatus = false;
 
   function openMenu() { isMenuOpen = true; }
   function closeMenu() { isMenuOpen = false; }
@@ -29,6 +28,7 @@
   
   
   // Handle keyboard shortcuts
+  /** @param {KeyboardEvent} event */
   function handleKeydown(event) {
     // CMD/CTRL + K to open search (grid view)
     if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
@@ -66,6 +66,7 @@
   }
   
   // Handle edit from viewer
+  /** @param {CustomEvent} event */
   function handleEdit(event) {
     const haiku = event.detail;
     // Close the grid view and navigate to home with the haiku data
@@ -75,6 +76,27 @@
       sessionStorage.setItem('editHaiku', JSON.stringify(haiku));
       // Navigate to home page
       window.location.href = base || '/';
+    }
+  }
+
+  // Clear editor state when clicking site title
+  /** @param {MouseEvent} event */
+  function handleSiteTitleClick(event) {
+    // Only clear state if we're on the home page
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    const basePath = base || '/';
+    
+    if (currentPath === basePath || currentPath === basePath + '/') {
+      event.preventDefault();
+      
+      // Clear session storage
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('editHaiku');
+      }
+      
+      // Dispatch custom event to clear editor state
+      const clearEvent = new CustomEvent('clearEditor', { bubbles: true });
+      document.dispatchEvent(clearEvent);
     }
   }
   
@@ -102,8 +124,7 @@
   async function updateSyncStatus() {
     if ($settingsStore.enableSync && $authStore.isAuthenticated) {
       try {
-        syncStatus = await gitHubSync.getSyncStatus();
-        showSyncStatus = $settingsStore.showSyncStatus;
+        await gitHubSync.getSyncStatus();
       } catch (error) {
         console.error('Failed to get sync status:', error);
       }
@@ -119,7 +140,7 @@
         return result;
       } catch (error) {
         console.error('Manual sync failed:', error);
-        return { success: false, message: error.message };
+        return { success: false, message: /** @type {Error} */(error).message };
       }
     }
     return { success: false, message: 'Sync not enabled or not authenticated' };
@@ -164,10 +185,6 @@
     updateSyncStatus();
   }
 
-  $: if (!$settingsStore.enableSync || !$authStore.isAuthenticated) {
-    syncStatus = null;
-    showSyncStatus = false;
-  }
   
   // Handle GitHub sign in
   function handleGitHubSignIn() {
@@ -213,7 +230,7 @@
     <div class="container mx-auto px-4 py-3">
       <div class="navbar p-0">
         <div class="navbar-start">
-          <a href="{base}/" class="font-semibold text-base-content site-title-link">Not {poemArticle} {poemName}</a>
+          <a href="{base}/" class="font-semibold text-base-content site-title-link" on:click={handleSiteTitleClick}>Not {poemArticle} {poemName}</a>
           
           <!-- Search button -->
           <div class="hidden sm:flex items-center gap-2 ml-4">
@@ -224,20 +241,6 @@
         </div>
         <div class="navbar-end flex items-center gap-2">
           <nav class="hidden sm:flex items-center gap-2">
-            <!-- Sync Status Indicator -->
-            {#if showSyncStatus && syncStatus}
-              <div class="sync-status-indicator" title="Sync Status">
-                {#if syncStatus.isSyncing}
-                  <div class="sync-spinner"></div>
-                {:else if syncStatus.hasUnsyncedRemote}
-                  <div class="sync-warning" title="Unsynced remote changes available">⚠️</div>
-                {:else if syncStatus.syncStatus === 'error'}
-                  <div class="sync-error" title="Sync error: {syncStatus.lastSyncError}">❌</div>
-                {:else if syncStatus.syncStatus === 'success'}
-                  <div class="sync-success" title="Last sync: {new Date(syncStatus.lastSyncTime).toLocaleString()}">✅</div>
-                {/if}
-              </div>
-            {/if}
 
             <a href="{base}/settings" class="btn btn-sm btn-ghost" aria-label="Settings" title="Settings">
               <SettingsIcon class="w-4 h-4" />
@@ -424,8 +427,8 @@
           <div class="avatar">
             <div class="w-16 rounded-full ring-2 ring-base-300">
               <img 
-                src={$authStore.user.avatar_url} 
-                alt={$authStore.user.name || $authStore.user.login}
+                src={(/** @type {any} */($authStore.user))?.avatar_url} 
+                alt={(/** @type {any} */($authStore.user))?.name || (/** @type {any} */($authStore.user))?.login}
                 class="rounded-full"
               />
             </div>
@@ -437,7 +440,7 @@
           Are you sure you want to sign out?
         </h4>
         <p class="text-sm text-base-content/70 mb-6">
-          You'll be signed out of <strong>{$authStore.user.name || $authStore.user.login}</strong>
+          You'll be signed out of <strong>{(/** @type {any} */($authStore.user))?.name || (/** @type {any} */($authStore.user))?.login}</strong>
         </p>
         
         <!-- Action buttons -->
@@ -501,45 +504,5 @@
     color: #3b82f6;
   }
 
-  /* Sync Status Indicator */
-  .sync-status-indicator {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    background: var(--bg-secondary, #f8fafc);
-    border: 1px solid var(--border-color, #e2e8f0);
-  }
-
-  .sync-spinner {
-    width: 16px;
-    height: 16px;
-    border: 2px solid var(--border-color, #e2e8f0);
-    border-top: 2px solid var(--primary, #3b82f6);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  .sync-warning {
-    font-size: 16px;
-    color: #f59e0b;
-  }
-
-  .sync-error {
-    font-size: 16px;
-    color: #ef4444;
-  }
-
-  .sync-success {
-    font-size: 16px;
-    color: #10b981;
-  }
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
 
 </style>

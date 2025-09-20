@@ -750,16 +750,36 @@
       right: 3px;
     }
 
-    /* Mobile status dropdown */
+    /* Mobile status dropdown - convert to compact inline style */
+    .status-dropdown {
+      width: 100%;
+    }
+    
+    .status-button {
+      width: 100%;
+      justify-content: space-between;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
     .status-dropdown-menu {
-      right: 0;
-      left: auto;
-      min-width: 120px;
+      position: static;
+      width: 100%;
+      margin-top: 8px;
+      box-shadow: none;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      min-width: auto;
     }
 
     .status-option {
-      font-size: 13px;
+      font-size: 12px;
       padding: 8px 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    
+    .status-option:last-child {
+      border-bottom: none;
     }
   }
 
@@ -796,6 +816,21 @@
     .toolbar-left {
       flex-direction: column;
       gap: 8px;
+    }
+    
+    /* Make status dropdown even more compact on very small screens */
+    .status-dropdown {
+      width: 100%;
+    }
+    
+    .status-button {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    
+    .status-option {
+      font-size: 11px;
+      padding: 6px 10px;
     }
 
     .toolbar-button,

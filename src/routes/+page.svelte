@@ -724,7 +724,7 @@
 </script>
 
 <svelte:head>
-  <title>Not a Haiku - Haiku assistance and stuff</title>
+  <title>Not a Haiku - Productivity as Poetry</title>
   <meta name="description" content={`Write beautiful ${poemNameLower} with real-time syllable counting`} />
 </svelte:head>
 

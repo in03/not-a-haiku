@@ -5,7 +5,7 @@
   import HaikuViewer from './HaikuViewer.svelte';
   import ConfirmationDialog from './ConfirmationDialog.svelte';
   import TagMultiSelect from './TagMultiSelect.svelte';
-  import { Check, X, Filter, SortAsc, SortDesc, Calendar, Type, Tag, MoreVertical, Edit, Trash2, Search, Grid3X3 } from 'lucide-svelte';
+  import { Check, X, Filter, SortAsc, SortDesc, Calendar, Type, Tag, MoreVertical, Edit, Trash2, Search, Grid3X3, ChevronDown } from 'lucide-svelte';
   
   export let haikus = [];
   export let isOpen = false;
@@ -19,7 +19,6 @@
   let filterTags = [];
   let searchQuery = '';
   let showFilters = false;
-  let showAllMode = false; // New: toggle between search and browse modes
   let searchInput;
   
   // Viewer state
@@ -33,6 +32,14 @@
   let lastSelectedIndex = -1;
   let showDeleteConfirmation = false;
   
+  // Dropdown state
+  let statusDropdownOpen = false;
+  let sortDropdownOpen = false;
+  let statusDropdownElement;
+   let sortDropdownElement;
+   let showMobileStatusSelector = false;
+   let mobileStatusDropdownElement;
+  
   // Available filter options
   let availableTags = [];
   
@@ -40,7 +47,9 @@
   $: if (haikus.length > 0) {
     const tagSet = new Set();
     haikus.forEach(haiku => {
+      if (haiku.tags && haiku.tags.length > 0) {
       haiku.tags.forEach(tag => tagSet.add(tag));
+      }
     });
     availableTags = Array.from(tagSet).sort();
   }
@@ -53,7 +62,7 @@
   // Filter and sort haikus
   $: {
     const currentSortState = `${sortBy}-${sortOrder}`;
-    const currentFilterState = `${filterStatus}-${filterTags.join(',')}-${searchQuery}-${showAllMode}`;
+    const currentFilterState = `${filterStatus}-${filterTags.join(',')}-${searchQuery}`;
     const currentHaikusLength = haikus.length; // Track haikus array changes (for deletions/additions)
     
     // Re-sort if sort/filter state changed OR if haikus array changed (deletions/additions)
@@ -63,11 +72,6 @@
       
       filteredHaikus = haikus
     .filter(haiku => {
-          // In search mode, only show results when there's a search query
-          if (!showAllMode && !searchQuery.trim()) {
-            return false;
-          }
-          
       // Status filter
       if (filterStatus && haiku.status !== filterStatus) return false;
       
@@ -157,6 +161,9 @@
     isOpen = false;
     selectedIndex = -1; // Reset selection
     clearSelection(); // Clear multi-select
+     statusDropdownOpen = false; // Close dropdowns
+     sortDropdownOpen = false;
+     showMobileStatusSelector = false;
     dispatch('close');
   }
   
@@ -300,6 +307,26 @@
     }
   }
 
+  // Get status color
+  function getStatusColor(status) {
+    switch (status) {
+      case 'todo': return '#fbbf24';
+      case 'in_progress': return '#3b82f6';
+      case 'done': return '#10b981';
+      default: return '#6b7280';
+    }
+  }
+
+  // Get sort display text
+  function getSortText(sortBy) {
+    switch (sortBy) {
+      case 'updatedAt': return 'Updated';
+      case 'createdAt': return 'Created';
+      case 'title': return 'Title';
+      default: return sortBy;
+    }
+  }
+
   // Generate consistent color for tag based on its name
   function getTagColor(tagName) {
     // Predefined color palette for tags
@@ -329,6 +356,34 @@
     
     return colors[Math.abs(hash) % colors.length];
   }
+
+  // Handle dropdown clicks
+  function handleStatusDropdownClick(event) {
+    event.stopPropagation();
+  }
+
+  function handleSortDropdownClick(event) {
+    event.stopPropagation();
+  }
+
+   // Handle click outside dropdowns
+   function handleClickOutside(event) {
+     if (statusDropdownElement && !statusDropdownElement.contains(event.target)) {
+       statusDropdownOpen = false;
+     }
+     if (sortDropdownElement && !sortDropdownElement.contains(event.target)) {
+       sortDropdownOpen = false;
+     }
+     if (showMobileStatusSelector && mobileStatusDropdownElement && !mobileStatusDropdownElement.contains(event.target)) {
+       showMobileStatusSelector = false;
+     }
+   }
+
+   // Mobile dropdown click handlers
+   function handleMobileStatusClick(event) {
+     event.stopPropagation();
+   }
+
 
   // Handle keyboard shortcuts and navigation
   function handleKeydown(event) {
@@ -439,28 +494,12 @@
     }
   }
 
-  // Toggle between search and browse modes
-  function toggleShowAllMode() {
-    dismissMultiSelect(); // Dismiss multiselect when switching modes
-    showAllMode = !showAllMode;
-    // Clear search when switching modes for a clean slate
-    searchQuery = '';
-    // Focus search input when switching to search mode
-    if (!showAllMode) {
-      setTimeout(() => {
-        if (searchInput) {
-          searchInput.focus();
-        }
-      }, 10);
-    }
-  }
 
   // Clear all filters
   function clearAllFilters() {
     filterStatus = '';
     filterTags = [];
     searchQuery = '';
-    showAllMode = false;
   }
 
   // Reset selection when filtered results change
@@ -482,7 +521,7 @@
   }
   
   // Focus search when component opens
-  $: if (isOpen && !showAllMode) {
+  $: if (isOpen) {
     setTimeout(() => {
       if (searchInput) {
         searchInput.focus();
@@ -493,8 +532,10 @@
   // Add event listeners
   onMount(() => {
     document.addEventListener('keydown', handleKeydown);
+    document.addEventListener('click', handleClickOutside, true);
     return () => {
       document.removeEventListener('keydown', handleKeydown);
+      document.removeEventListener('click', handleClickOutside, true);
     };
   });
 </script>
@@ -508,17 +549,17 @@
         <div class="desktop-header">
           <div class="grid-view-title">
             <Search class="search-icon" size="20" />
-            <h2>{showAllMode ? 'Browse All Haikus' : 'Search Haikus'}</h2>
+            <h2>Browse Haikus</h2>
             <span class="haiku-count">{filteredHaikus.length} of {haikus.length}</span>
           </div>
           
-          <!-- Inline Search and Mode Toggle -->
+          <!-- Search Input -->
           <div class="header-search-section">
             <div class="header-search-container">
               <input
                 type="text"
                 class="header-search-input"
-                placeholder={showAllMode ? "Search in all haikus..." : "Search haikus by title, content, or tags..."}
+                placeholder="Search haikus by title, content, or tags..."
                 bind:value={searchQuery}
                 bind:this={searchInput}
               />
@@ -528,16 +569,6 @@
                 </button>
               {/if}
             </div>
-            
-            <button class="mode-toggle" class:active={showAllMode} on:click={toggleShowAllMode}>
-              {#if showAllMode}
-                <Search size="16" />
-                <span>Search Mode</span>
-              {:else}
-                <Grid3X3 size="16" />
-                <span>Browse All</span>
-              {/if}
-            </button>
           </div>
           
           <div class="grid-view-actions">
@@ -549,7 +580,7 @@
 
         <!-- Mobile Header -->
         <div class="mobile-header">
-          <!-- Top row: Back button, Search input, Browse toggle -->
+          <!-- Top row: Back button, Search input -->
           <div class="mobile-header-top">
             <button class="mobile-back-button" on:click={closeGridView} title="Back">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -572,40 +603,137 @@
                 </button>
               {/if}
             </div>
-            
-            <button class="mobile-mode-toggle" class:active={showAllMode} on:click={toggleShowAllMode} title={showAllMode ? 'Switch to search mode' : 'Browse all haikus'}>
-              <Grid3X3 size="18" />
-            </button>
           </div>
           
-          <!-- Bottom row: Compact filter buttons -->
+           <!-- Bottom row: Compact filter dropdowns -->
           <div class="mobile-filters-row">
-            <button class="mobile-filter-button" class:active={filterStatus === 'todo'} on:click={() => filterStatus = filterStatus === 'todo' ? '' : 'todo'}>
+             {#if $settingsStore.enableTaskTracking}
+               <div class="mobile-status-dropdown" bind:this={mobileStatusDropdownElement}>
+                 <button 
+                   class="mobile-filter-button mobile-status-button" 
+                   class:active={filterStatus !== ''}
+                   on:click={() => showMobileStatusSelector = !showMobileStatusSelector}
+                   title="Filter by status"
+                 >
+                   {filterStatus ? getStatusText(filterStatus) : 'Status'}
+                   <ChevronDown size="12" class={showMobileStatusSelector ? 'rotated' : ''} />
+                 </button>
+                 
+                 {#if showMobileStatusSelector}
+                   <div class="mobile-status-dropdown-menu" on:click={handleMobileStatusClick}>
+                     <button 
+                       class="mobile-status-option" 
+                       class:active={filterStatus === ''}
+                       on:click={() => { filterStatus = ''; showMobileStatusSelector = false; }}
+                     >
+                       All Status
+                     </button>
+                     <button 
+                       class="mobile-status-option" 
+                       class:active={filterStatus === 'todo'}
+                       on:click={() => { filterStatus = 'todo'; showMobileStatusSelector = false; }}
+                     >
+                       <div class="status-indicator" style="background-color: {getStatusColor('todo')};"></div>
               Todo
             </button>
-            <button class="mobile-filter-button" class:active={filterStatus === 'in_progress'} on:click={() => filterStatus = filterStatus === 'in_progress' ? '' : 'in_progress'}>
+                     <button 
+                       class="mobile-status-option" 
+                       class:active={filterStatus === 'in_progress'}
+                       on:click={() => { filterStatus = 'in_progress'; showMobileStatusSelector = false; }}
+                     >
+                       <div class="status-indicator" style="background-color: {getStatusColor('in_progress')};"></div>
               In Progress
             </button>
-            <button class="mobile-filter-button" class:active={filterStatus === 'done'} on:click={() => filterStatus = filterStatus === 'done' ? '' : 'done'}>
+                     <button 
+                       class="mobile-status-option" 
+                       class:active={filterStatus === 'done'}
+                       on:click={() => { filterStatus = 'done'; showMobileStatusSelector = false; }}
+                     >
+                       <div class="status-indicator" style="background-color: {getStatusColor('done')};"></div>
               Done
             </button>
-            <button class="mobile-sort-button" on:click={() => sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'} title={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}>
-              {#if sortOrder === 'asc'}
-                <SortAsc size="14" />
-              {:else}
-                <SortDesc size="14" />
-              {/if}
-            </button>
+                   </div>
+                 {/if}
+               </div>
+             {/if}
+             
+             <div class="mobile-tags-container">
+               <TagMultiSelect
+                 availableTags={availableTags}
+                 bind:selectedTags={filterTags}
+                 placeholder="Filter by tags..."
+                 on:change={() => {}}
+                 compact={false}
+               />
+             </div>
+             
+             <div class="mobile-sort-dropdown" bind:this={sortDropdownElement}>
+               <div class="hybrid-sort-control mobile-hybrid-sort">
+                 <!-- Sort Field Dropdown -->
+                 <button 
+                   class="sort-field-button mobile-sort-field" 
+                   on:click={() => sortDropdownOpen = !sortDropdownOpen}
+                 >
+                   <span>{getSortText(sortBy)}</span>
+                   <ChevronDown size="12" class={sortDropdownOpen ? 'rotated' : ''} />
+                 </button>
+                 
+                 <!-- Divider Line -->
+                 <div class="sort-divider mobile-sort-divider"></div>
+                 
+                 <!-- Sort Order Toggle -->
+                 <button 
+                   class="sort-order-button mobile-sort-order" 
+                   on:click={() => sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'}
+                   title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                 >
+                   {#if sortOrder === 'asc'}
+                     <SortAsc size="12" />
+                   {:else}
+                     <SortDesc size="12" />
+                   {/if}
+                 </button>
+                 
+                 {#if sortDropdownOpen}
+                   <div class="sort-dropdown-menu" on:click={handleSortDropdownClick}>
+                     <button 
+                       class="sort-option" 
+                       class:active={sortBy === 'updatedAt'}
+                       on:click={() => { sortBy = 'updatedAt'; sortDropdownOpen = false; }}
+                     >
+                       <span>Updated</span>
+                       {#if sortBy === 'updatedAt'}<Check size="12" />{/if}
+                     </button>
+                     <button 
+                       class="sort-option" 
+                       class:active={sortBy === 'createdAt'}
+                       on:click={() => { sortBy = 'createdAt'; sortDropdownOpen = false; }}
+                     >
+                       <span>Created</span>
+                       {#if sortBy === 'createdAt'}<Check size="12" />{/if}
+                     </button>
+                     <button 
+                       class="sort-option" 
+                       class:active={sortBy === 'title'}
+                       on:click={() => { sortBy = 'title'; sortDropdownOpen = false; }}
+                     >
+                       <span>Title</span>
+                       {#if sortBy === 'title'}<Check size="12" />{/if}
+                     </button>
+                   </div>
+                 {/if}
+               </div>
+             </div>
             <button class="mobile-clear-button" on:click={clearAllFilters} title="Clear all filters">
               Clear
             </button>
           </div>
         </div>
       </div>
+      
 
       
       <!-- Filters -->
-      {#if showFilters || showAllMode || (filteredHaikus.length > 0 && !showAllMode)}
         <div class="filters-section">
           {#if selectedHaikus.size > 0}
             <!-- Multi-select actions -->
@@ -626,71 +754,142 @@
                 Clear
               </button>
             </div>
-          {/if}
-          
-          <div class="filter-row">
-            
-            <div class="filter-group">
-              <label class="filter-label">Status</label>
-              <div class="select-wrapper">
-                <select class="filter-select" bind:value={filterStatus}>
-                  <option value="">All Statuses</option>
-                  <option value="todo">To Do</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="done">Done</option>
-                </select>
+        {:else}
+          <!-- Compact filter toolbar -->
+          <div class="filter-toolbar">
+            {#if $settingsStore.enableTaskTracking}
+              <div class="filter-toolbar-group">
+                <div class="status-dropdown" bind:this={statusDropdownElement}>
+                  <button 
+                    class="status-button compact" 
+                    on:click={() => statusDropdownOpen = !statusDropdownOpen}
+                    style="border-color: {getStatusColor(filterStatus)}; color: {getStatusColor(filterStatus)}"
+                  >
+                    <span>{filterStatus ? getStatusText(filterStatus) : 'All Statuses'}</span>
+                    <ChevronDown size="14" class={statusDropdownOpen ? 'rotated' : ''} />
+                  </button>
+                  
+                  {#if statusDropdownOpen}
+                    <div class="status-dropdown-menu" on:click={handleStatusDropdownClick}>
+                      <button 
+                        class="status-option" 
+                        class:active={filterStatus === ''}
+                        on:click={() => { filterStatus = ''; statusDropdownOpen = false; }}
+                      >
+                        <span>All Statuses</span>
+                        {#if filterStatus === ''}<Check size="14" />{/if}
+                      </button>
+                      <button 
+                        class="status-option" 
+                        class:active={filterStatus === 'todo'}
+                        on:click={() => { filterStatus = 'todo'; statusDropdownOpen = false; }}
+                      >
+                        <div class="status-indicator" style="background-color: #fbbf24;"></div>
+                        <span>To Do</span>
+                        {#if filterStatus === 'todo'}<Check size="14" />{/if}
+                      </button>
+                      <button 
+                        class="status-option" 
+                        class:active={filterStatus === 'in_progress'}
+                        on:click={() => { filterStatus = 'in_progress'; statusDropdownOpen = false; }}
+                      >
+                        <div class="status-indicator" style="background-color: #3b82f6;"></div>
+                        <span>In Progress</span>
+                        {#if filterStatus === 'in_progress'}<Check size="14" />{/if}
+                      </button>
+                      <button 
+                        class="status-option" 
+                        class:active={filterStatus === 'done'}
+                        on:click={() => { filterStatus = 'done'; statusDropdownOpen = false; }}
+                      >
+                        <div class="status-indicator" style="background-color: #10b981;"></div>
+                        <span>Done</span>
+                        {#if filterStatus === 'done'}<Check size="14" />{/if}
+                      </button>
               </div>
+                  {/if}
             </div>
-            
-            <div class="filter-group">
-              <label class="filter-label">Sort</label>
-              <div class="sort-controls">
-                <div class="select-wrapper">
-                  <select class="filter-select" bind:value={sortBy}>
-                    <option value="updatedAt">Updated</option>
-                    <option value="createdAt">Created</option>
-                    <option value="title">Title</option>
-                  </select>
                 </div>
+            {/if}
+            
+            <div class="filter-toolbar-group">
+              <div class="hybrid-sort-control" bind:this={sortDropdownElement}>
+                <!-- Sort Field Dropdown -->
+                <button 
+                  class="sort-field-button" 
+                  on:click={() => sortDropdownOpen = !sortDropdownOpen}
+                >
+                  <span>{getSortText(sortBy)}</span>
+                  <ChevronDown size="14" class={sortDropdownOpen ? 'rotated' : ''} />
+                </button>
+                
+                <!-- Divider Line -->
+                <div class="sort-divider"></div>
+                
+                <!-- Sort Order Toggle -->
                 <button 
                   class="sort-order-button" 
                   on:click={() => sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'}
                   title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
                 >
                   {#if sortOrder === 'asc'}
-                    <SortAsc size="16" />
+                    <SortAsc size="14" />
                   {:else}
-                    <SortDesc size="16" />
+                    <SortDesc size="14" />
                   {/if}
                 </button>
+                
+                 {#if sortDropdownOpen}
+                   <div class="sort-dropdown-menu" on:click={handleSortDropdownClick}>
+                     <button 
+                       class="sort-option" 
+                       class:active={sortBy === 'updatedAt'}
+                       on:click={() => { sortBy = 'updatedAt'; sortDropdownOpen = false; }}
+                     >
+                       <span>Updated</span>
+                       {#if sortBy === 'updatedAt'}<Check size="14" />{/if}
+                     </button>
+                     <button 
+                       class="sort-option" 
+                       class:active={sortBy === 'createdAt'}
+                       on:click={() => { sortBy = 'createdAt'; sortDropdownOpen = false; }}
+                     >
+                       <span>Created</span>
+                       {#if sortBy === 'createdAt'}<Check size="14" />{/if}
+                     </button>
+                     <button 
+                       class="sort-option" 
+                       class:active={sortBy === 'title'}
+                       on:click={() => { sortBy = 'title'; sortDropdownOpen = false; }}
+                     >
+                       <span>Title</span>
+                       {#if sortBy === 'title'}<Check size="14" />{/if}
+                     </button>
+                   </div>
+                 {/if}
               </div>
-            </div>
-            
-            {#if filterStatus || filterTags.length > 0 || searchQuery}
-              <div class="filter-group">
-                <button class="clear-filters" on:click={clearFilters}>
-                  Clear Filters
-                </button>
-              </div>
-            {/if}
           </div>
           
-          {#if availableTags.length > 0}
-            <div class="filter-row">
-              <div class="filter-group tags-filter">
-                <label class="filter-label">Tags</label>
-                <TagMultiSelect
-                  availableTags={availableTags}
-                  bind:selectedTags={filterTags}
-                  placeholder="Filter by tags..."
-                  on:change={() => dismissMultiSelect()}
-                />
-              </div>
+             <div class="filter-toolbar-group">
+                 <TagMultiSelect
+                   availableTags={availableTags}
+                   bind:selectedTags={filterTags}
+                 placeholder="Tags..."
+                   on:change={() => dismissMultiSelect()}
+                 compact={false}
+                 />
+               </div>
+            
+            {#if filterStatus || filterTags.length > 0 || searchQuery}
+              <div class="filter-toolbar-group">
+                <button class="clear-filters compact" on:click={clearFilters}>
+                  Clear
+                </button>
             </div>
           {/if}
-          
         </div>
       {/if}
+      </div>
       
       <!-- Grid Content -->
       <div class="grid-view-content">
@@ -699,18 +898,16 @@
             {#if haikus.length === 0}
               <div class="empty-icon">📝</div>
               <h3>No haikus yet</h3>
-              <p>Start writing haikus to see them here</p>
-            {:else if !showAllMode && !searchQuery.trim()}
-              <div class="search-empty-header">
-                <Search class="search-empty-icon" size="20" />
-                <h3>Start searching</h3>
-              </div>
-              <div class="keyboard-shortcuts">
+              <div class="empty-state-content">
+                <p class="desktop-only">Start writing haikus to see them here</p>
+                <div class="keyboard-shortcuts desktop-only">
                 <ul>
                   <li><strong>Quick search:</strong> <kbd><strong>Ctrl</strong></kbd> + <kbd><strong>K</strong></kbd></li>
                   <li><strong>Navigate:</strong> Arrow keys, <kbd><strong>Enter</strong></kbd> to open, <kbd><strong>ESC</strong></kbd> to close</li>
                   <li><strong>Multi-select:</strong> <kbd><strong>Ctrl</strong></kbd>/<kbd><strong>Shift</strong></kbd> + click</li>
                 </ul>
+                </div>
+                <p class="mobile-only">Start writing haikus to see them here</p>
               </div>
             {:else}
               <div class="empty-icon">🔍</div>
@@ -896,11 +1093,12 @@
     position: relative;
     flex: 1;
     min-width: 200px;
+    max-width: 400px;
   }
 
   .header-search-input {
     width: 100%;
-    padding: 12px 40px 12px 12px;
+    padding: 12px 32px 12px 12px;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -928,18 +1126,23 @@
   }
 
   .close-button {
-    padding: 8px;
-    background: none;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: var(--bg-tertiary);
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
     border-radius: 6px;
     transition: all 0.2s ease;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .close-button:hover {
-    background: var(--bg-tertiary);
+    background: var(--bg-secondary);
     color: var(--text-primary);
   }
 
@@ -993,14 +1196,21 @@
 
   .search-clear {
     position: absolute;
-    right: 16px;
-    padding: 4px;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    padding: 0;
     background: none;
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
     border-radius: 4px;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .search-clear:hover {
@@ -1008,31 +1218,6 @@
     color: var(--text-primary);
   }
 
-  .mode-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px;
-    background: var(--bg-primary);
-    border: 2px solid var(--border-color);
-    border-radius: 12px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 14px;
-    font-weight: 500;
-  }
-
-  .mode-toggle:hover {
-    border-color: var(--border-focus);
-    color: var(--text-primary);
-  }
-
-  .mode-toggle.active {
-    background: var(--border-focus);
-    border-color: var(--border-focus);
-    color: white;
-  }
 
   .search-empty-header {
     display: flex;
@@ -1097,35 +1282,6 @@
     gap: 12px;
   }
   
-  .header-search-section {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-left: auto;
-  }
-  
-  .header-search-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-  
-  .header-search-input {
-    width: 280px;
-    padding: 8px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: 14px;
-    transition: all 0.2s ease;
-  }
-  
-  .header-search-input:focus {
-    outline: none;
-    border-color: var(--border-focus);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-  }
 
   .grid-view-title h2 {
     margin: 0;
@@ -1171,20 +1327,6 @@
     color: var(--text-primary);
   }
 
-  .close-button {
-    padding: 8px;
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-  }
-
-  .close-button:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-  }
   
   .multi-select-actions {
     display: flex;
@@ -1235,6 +1377,189 @@
     padding: 16px 24px;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-secondary);
+  }
+
+  .filter-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .filter-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Hybrid Sort Control */
+  .hybrid-sort-control {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: visible;
+    min-width: 140px;
+  }
+
+  .sort-field-button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+  }
+
+  .sort-field-button:hover {
+    background: var(--bg-secondary);
+  }
+
+  .sort-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+    flex-shrink: 0;
+  }
+
+  .hybrid-sort-control .sort-order-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .hybrid-sort-control .sort-order-button:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  .filter-select.compact {
+    padding: 6px 8px;
+    font-size: 13px;
+    min-width: 100px;
+  }
+
+  .sort-order-button.compact {
+    padding: 6px;
+    min-width: auto;
+  }
+
+  .clear-filters.compact {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+
+  /* Custom Dropdown Styles */
+  .status-dropdown,
+  .sort-dropdown {
+    position: relative;
+    min-width: 100px;
+  }
+
+  .status-button,
+  .sort-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 13px;
+    font-weight: 500;
+    min-width: 100px;
+    justify-content: space-between;
+  }
+
+  .status-button.compact,
+  .sort-button.compact {
+    padding: 6px 8px;
+    font-size: 13px;
+    min-width: 100px;
+  }
+
+  .status-button:hover,
+  .sort-button:hover {
+    background: var(--bg-secondary);
+  }
+
+  .status-dropdown-menu,
+  .sort-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 140px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px var(--card-shadow);
+    z-index: 10;
+    margin-top: 4px;
+  }
+
+  .status-option,
+  .sort-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    text-align: left;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 13px;
+  }
+
+  .status-option:hover,
+  .sort-option:hover {
+    background: var(--bg-secondary);
+  }
+
+  .status-option.active,
+  .sort-option.active {
+    background: var(--bg-tertiary);
+  }
+
+  .status-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .rotated {
+    transform: rotate(180deg);
+  }
+
+  .desktop-only {
+    display: block;
+  }
+
+  .mobile-only {
+    display: none;
+  }
+
+  .empty-state-content {
+    text-align: center;
   }
 
   .filter-row {
@@ -1373,19 +1698,19 @@
 
   .clear-filters {
     padding: 6px 12px;
-    background: none;
-    border: 1px solid var(--border-color);
+    background: #dc2626;
+    border: 1px solid #dc2626;
     border-radius: 6px;
-    color: var(--text-secondary);
+    color: white;
     cursor: pointer;
     transition: all 0.2s ease;
     font-size: 12px;
   }
 
   .clear-filters:hover {
-    background: #fef2f2;
-    border-color: #fecaca;
-    color: #dc2626;
+    background: #b91c1c;
+    border-color: #b91c1c;
+    color: white;
   }
 
   .grid-view-content {
@@ -1423,8 +1748,9 @@
 
   .haiku-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+     grid-template-columns: repeat(auto-fit, 400px);
     gap: 20px;
+     justify-content: center;
   }
 
   .haiku-card {
@@ -1632,8 +1958,25 @@
     color: #065f46;
   }
 
-  /* Mobile Responsiveness */
-  @media (max-width: 768px) {
+   /* Tablet Responsiveness (480px - 768px) */
+   @media (max-width: 768px) and (min-width: 481px) {
+     /* Tablet-specific styles for tags dropdown */
+     .mobile-tags-container :global(.tag-multiselect) {
+       min-width: 140px;
+       max-width: 180px;
+     }
+
+     .mobile-tags-container :global(.tag-multiselect .selected-tags-container) {
+       min-height: 32px;
+       padding: 6px 8px;
+       font-size: 12px;
+     }
+
+     /* Ensure dropdown menu can be wider than button */
+     .mobile-tags-container :global(.tag-multiselect .tag-dropdown-menu) {
+       min-width: 200px;
+       max-width: 300px;
+     }
     .grid-view-overlay {
       padding: 10px;
     }
@@ -1679,12 +2022,6 @@
       padding: 10px 35px 10px 10px;
     }
 
-    .mode-toggle {
-      padding: 10px 12px;
-      font-size: 13px;
-      gap: 6px;
-      flex-shrink: 0;
-    }
 
     .grid-view-actions {
       margin-left: 0;
@@ -1692,12 +2029,14 @@
     }
 
     .close-button {
-      padding: 6px;
+      width: 28px;
+      height: 28px;
+      padding: 0;
     }
 
     .close-button :global(svg) {
-      width: 18px;
-      height: 18px;
+      width: 16px;
+      height: 16px;
     }
 
     /* Mobile grid adjustments */
@@ -1705,6 +2044,8 @@
       grid-template-columns: 1fr;
       gap: 12px;
       padding: 12px;
+      max-width: 400px;
+      margin: 0 auto;
     }
 
     .haiku-card {
@@ -1857,14 +2198,19 @@
       min-width: auto;
     }
 
-    .mode-toggle {
-      width: 100%;
-      justify-content: center;
-    }
 
     /* Hide search icon on very small screens to save space */
     .search-icon {
       display: none;
+    }
+
+    /* Mobile responsive for empty state */
+    .desktop-only {
+      display: none;
+    }
+
+    .mobile-only {
+      display: block;
     }
   }
 
@@ -2017,25 +2363,34 @@
     color: white;
   }
 
-  .mobile-sort-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 28px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-  }
 
-  .mobile-sort-button:hover {
-    background: var(--bg-secondary);
-    border-color: var(--border-focus);
-  }
+   /* Mobile Hybrid Sort Control */
+   .mobile-hybrid-sort {
+     min-width: 120px;
+   }
+
+   .mobile-sort-field {
+     font-size: 12px;
+     padding: 6px 8px;
+   }
+
+   .mobile-sort-divider {
+     height: 20px;
+   }
+
+   .mobile-sort-order {
+     padding: 6px;
+   }
+
+   .mobile-sort-dropdown {
+     position: relative;
+   }
+
+   /* Mobile Tags Container */
+   .mobile-tags-container {
+     flex: 1;
+     min-width: 0;
+   }
 
   .mobile-clear-button {
     padding: 6px 10px;
@@ -2055,9 +2410,268 @@
     border-color: var(--border-focus);
   }
 
-  /* Override mobile styles */
-  @media (max-width: 768px) {
+   /* Mobile Dropdowns */
+   .mobile-status-dropdown {
+     position: relative;
+   }
+
+   .mobile-status-button {
+     display: flex;
+     align-items: center;
+     gap: 4px;
+   }
+
+   .mobile-status-dropdown-menu {
+     position: absolute;
+     top: 100%;
+     left: 0;
+     right: 0;
+     background: var(--bg-primary);
+     border: 1px solid var(--border-color);
+     border-radius: 8px;
+     box-shadow: 0 8px 24px var(--card-shadow);
+     z-index: 1000;
+     margin-top: 4px;
+     padding: 8px;
+     min-width: 200px;
+   }
+
+   .mobile-status-option {
+     width: 100%;
+     display: flex;
+     align-items: center;
+     gap: 8px;
+     padding: 8px 12px;
+     border: none;
+     background: none;
+     color: var(--text-primary);
+     cursor: pointer;
+     border-radius: 6px;
+     transition: all 0.2s ease;
+     text-align: left;
+     font-size: 14px;
+   }
+
+   .mobile-status-option:hover {
+     background: var(--bg-secondary);
+   }
+
+   .mobile-status-option.active {
+     background: var(--border-focus);
+     color: white;
+   }
+
+   .mobile-status-option .status-indicator {
+     width: 8px;
+     height: 8px;
+     border-radius: 50%;
+     flex-shrink: 0;
+   }
+
+  /* Mobile Responsiveness (480px and below) */
+  @media (max-width: 480px) {
+    .grid-view-overlay {
+      padding: 10px;
+    }
+
+    .grid-view-modal {
+      max-height: 95vh;
+    }
+
+    .grid-view-header {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 16px;
+      gap: 12px;
+    }
+
+    .grid-view-title {
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .grid-view-title h2 {
+      font-size: 18px;
+      flex: 1;
+    }
+
+    .haiku-count {
+      font-size: 12px;
+      padding: 3px 6px;
+      flex-shrink: 0;
+    }
+
+    .header-search-section {
+      gap: 8px;
+    }
+
+    .header-search-container {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .header-search-input {
+      font-size: 16px; /* Prevent zoom on iOS */
+      padding: 10px 35px 10px 10px;
+    }
+
+    .grid-view-actions {
+      margin-left: 0;
+      justify-content: flex-end;
+    }
+
+    .close-button {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+    }
+
+    .close-button :global(svg) {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Mobile grid adjustments */
+    .haiku-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 12px;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    .haiku-card {
+      padding: 12px;
+    }
+
+    .haiku-card-header {
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .haiku-title {
+      font-size: 14px;
+    }
+
+    .haiku-content {
+      margin-bottom: 8px;
+    }
+
+    .haiku-line {
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .haiku-card-footer {
+      padding: 8px 0 0 0;
+      gap: 8px;
+    }
+
+    .haiku-meta {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .haiku-tags {
+      gap: 3px;
+    }
+
+    .haiku-tag {
+      font-size: 10px;
+      padding: 2px 4px;
+    }
+
+    .haiku-info {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .haiku-date {
+      font-size: 11px;
+    }
+
+    .haiku-status {
+      font-size: 9px;
+      padding: 2px 4px;
+    }
+
+    /* Mobile filters */
+    .filters-section {
+      padding: 12px;
+    }
+
+    .filter-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+
+    .filter-group {
+      width: 100%;
+    }
+
+    .filter-label {
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .filter-select {
+      width: 100%;
+      font-size: 14px;
+      padding: 8px 12px;
+    }
+
+    .sort-controls {
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .sort-toggle {
+      font-size: 12px;
+      padding: 6px 10px;
+    }
+
+    .clear-filters {
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+
+    /* Mobile multi-select actions */
+    .multi-select-actions {
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+
+    .selected-count {
+      font-size: 12px;
+    }
+
+    .action-button {
+      font-size: 12px;
+      padding: 6px 10px;
+    }
+
+    /* Mobile keyboard shortcuts */
+    .keyboard-shortcuts {
+      max-width: 100%;
+      margin-top: 12px;
+    }
+
+    .keyboard-shortcuts li {
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .keyboard-shortcuts kbd {
+      font-size: 9px;
+      padding: 1px 3px;
+    }
+  }
+
     /* Hide desktop header on mobile */
+  @media (max-width: 768px) {
     .desktop-header {
       display: none;
     }
@@ -2073,19 +2687,57 @@
     }
   }
 
-  @media (max-width: 480px) {
-    .mobile-filters-row {
-      gap: 4px;
-    }
+   @media (max-width: 480px) {
+     .mobile-filters-row {
+       gap: 4px;
+     }
 
-    .mobile-filter-button {
-      padding: 4px 8px;
-      font-size: 11px;
-    }
+     .mobile-filter-button {
+       padding: 4px 8px;
+       font-size: 11px;
+     }
 
-    .mobile-clear-button {
-      padding: 4px 8px;
-      font-size: 11px;
-    }
-  }
+     .mobile-clear-button {
+       padding: 4px 8px;
+       font-size: 11px;
+     }
+
+     /* Compact variants for <480px */
+     .mobile-hybrid-sort {
+       min-width: 100px;
+     }
+
+     .mobile-sort-field {
+       font-size: 11px;
+       padding: 4px 6px;
+     }
+
+     .mobile-sort-divider {
+       height: 18px;
+     }
+
+     .mobile-sort-order {
+       padding: 4px;
+     }
+
+     .mobile-sort-order :global(svg) {
+       width: 10px;
+       height: 10px;
+     }
+
+     .mobile-tags-container {
+       min-width: 120px;
+     }
+
+     .mobile-tags-container :global(.tag-multiselect) {
+       min-width: 120px;
+     }
+
+     .mobile-tags-container :global(.tag-multiselect .selected-tags-container) {
+       min-height: 28px;
+       padding: 4px 6px;
+       font-size: 11px;
+     }
+   }
+
 </style>

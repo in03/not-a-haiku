@@ -6,6 +6,7 @@
   export let selectedTags = [];
   export let placeholder = "Select tags...";
   export let maxHeight = "200px";
+  export let compact = false;
 
   const dispatch = createEventDispatcher();
 
@@ -112,7 +113,7 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-  <div class="tag-multiselect" bind:this={dropdownElement}>
+  <div class="tag-multiselect" class:compact bind:this={dropdownElement}>
   <!-- Selected Tags Display -->
   <div class="selected-tags-container" on:click={handleContainerClick}>
     {#if selectedTags.length === 0}
@@ -194,6 +195,11 @@
     width: 200px; /* Default width for desktop */
   }
 
+  .tag-multiselect.compact {
+    min-width: 120px;
+    width: 150px;
+  }
+
   .selected-tags-container {
     min-height: 40px;
     max-height: 40px;
@@ -207,6 +213,14 @@
     gap: 8px;
     transition: all 0.2s ease;
     position: relative;
+  }
+
+  .tag-multiselect.compact .selected-tags-container {
+    min-height: 32px;
+    max-height: 32px;
+    padding: 6px 28px 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
   }
 
   .selected-tags-container:hover {

@@ -17,7 +17,7 @@
     poemType: 'haiku',
     showProgressBar: true,
     elevenlabsApiKey: '',
-    ttsPauseDuration: 1.0,
+    ttsPauseDuration: 0.5,
     enableTaskTracking: false,
     enableTTS: false,
     enableCritique: false,

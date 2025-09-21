@@ -438,6 +438,7 @@
   
   .status-dropdown {
     position: relative;
+    max-width: 110px;
   }
   
   .status-button {
@@ -656,7 +657,7 @@
     transform: rotate(180deg);
   }
 
-  /* Mobile Responsiveness */
+  /* Tablet and Mobile (768px and below) */
   @media (max-width: 768px) {
     .viewer-overlay {
       padding: 10px;
@@ -694,12 +695,20 @@
     .viewer-toolbar {
       padding: 12px 16px;
       gap: 8px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: stretch;
     }
 
     .toolbar-left {
       gap: 8px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .toolbar-tags {
+      align-self: flex-start;
+      margin-top: 0;
     }
 
     .toolbar-button {
@@ -763,10 +772,12 @@
     }
 
     .status-dropdown-menu {
-      position: static;
+      position: absolute;
+      top: 100%;
+      left: 0;
       width: 100%;
-      margin-top: 8px;
-      box-shadow: none;
+      margin-top: 4px;
+      box-shadow: 0 8px 24px var(--card-shadow);
       border: 1px solid var(--border-color);
       border-radius: 6px;
       min-width: auto;
@@ -783,6 +794,7 @@
     }
   }
 
+  /* Mobile (480px and below) */
   @media (max-width: 480px) {
     .viewer-header {
       padding: 12px;
@@ -814,36 +826,34 @@
     }
 
     .toolbar-left {
-      flex-direction: column;
       gap: 8px;
-    }
-    
-    /* Make status dropdown even more compact on very small screens */
-    .status-dropdown {
-      width: 100%;
-    }
-    
-    .status-button {
-      padding: 6px 10px;
-      font-size: 12px;
-    }
-    
-    .status-option {
-      font-size: 11px;
-      padding: 6px 10px;
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+      margin-bottom: 8px;
     }
 
-    .toolbar-button,
-    .status-button {
-      width: 100%;
+    .toolbar-button span {
+      display: none;
+    }
+
+    .toolbar-button {
+      min-width: 40px;
+      max-width: 60px;
+      padding: 8px;
+      gap: 0;
       justify-content: center;
-      font-size: 14px;
-      padding: 10px 16px;
+      font-size: 13px;
+    }
+
+    .status-button {
+      padding: 8px 12px;
+      font-size: 13px;
+      min-width: 100px;
     }
 
     .toolbar-tags {
+      align-self: flex-start;
       margin-top: 0;
-      justify-content: center;
     }
 
     .haiku-display {

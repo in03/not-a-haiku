@@ -1,4 +1,4 @@
-# 🚫 Not a Haiku 🍃
+# Not a Haiku 🍃
 
 A haiku writing app that validates syllable count in real-time and helps you turn tasks into poetry.
 
@@ -9,6 +9,10 @@ A haiku writing app that validates syllable count in real-time and helps you tur
 ## What It Does
 
 *Not a Haiku* helps you write haikus (or other syllable-constrained poetry). It validates syllable count in real-time using fast dictionary lookup combined with a tiny client-side neural model. It also rates, critiques and tags your haikus using AI analysis powered by GitHub models.
+
+<img src="https://github.com/user-attachments/assets/8271a417-5c9b-4142-a374-6f1d5e7ae0e4" width=640 height=384/>
+
+> Real-time syllable counting and line validation
 
 ## Features
 
@@ -21,6 +25,10 @@ A haiku writing app that validates syllable count in real-time and helps you tur
 - ✨ **Multiple Poem Types** - Haiku, Tanka, Cinquain, Nonet, Etheree
 - 🔄 **GitHub Sync** - Backup and sync across devices using GitHub Gist
 - 🎉 **Celebration effects** - Confetti ofc
+
+<img src="https://github.com/user-attachments/assets/5788a2f0-265a-4976-9d30-32eff5faeff6" width=640 height=384/>
+
+> Supports multiple types of syllable constrained poetry
 
 ## Development
 
